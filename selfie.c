@@ -6280,6 +6280,8 @@ void boot(int argc, int *argv) {
 // -----------------------------------------------------------------
 
 int selfie(int argc, int* argv) {
+    print("This is BeTheCompiler Selfie\n");
+    
     if (argc < 2)
         return -1;
     else {
