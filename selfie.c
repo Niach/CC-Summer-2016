@@ -654,6 +654,7 @@ int rs          = 0;
 int rt          = 0;
 int rd          = 0;
 int immediate   = 0;
+int shamt		= 0;
 int function    = 0;
 int instr_index = 0;
 
@@ -3857,7 +3858,7 @@ void decodeRFormat() {
     rs          = getRS(ir);
     rt          = getRT(ir);
     rd          = getRD(ir);
-    immediate   = getShamt(ir);
+    shamt       = getShamt(ir);
     function    = getFunction(ir);
     instr_index = 0;
 }
@@ -5690,19 +5691,19 @@ void fct_sll() {
 	        print((int*) ",");
 	        printRegister(rt);
 	        print((int*) ",");
-	        print(itoa(signExtend(immediate), string_buffer, 10, 0, 0));
+	        print(itoa(signExtend(shamt), string_buffer, 10, 0, 0));
 	        if (interpret) {
 	            print((int*) ": ");
 	            printRegister(rt);
 	            print((int*) "=");
-	            print(itoa(*(registers+rs), string_buffer, 10, 0, 0));
+	            print(itoa(*(registers+rt), string_buffer, 10, 0, 0));
 	            print((int*) ",shamt=");
-	            print(itoa(signExtend(immediate), string_buffer, 10, 0, 0));
+	            print(itoa(signExtend(shamt), string_buffer, 10, 0, 0));
 	        }
 	    }
 
 	    if (interpret) {
-	        *(registers+rd) = leftShift(*(registers+rt), immediate);
+	        *(registers+rd) = leftShift(*(registers+rt), shamt);
 
 	        pc = pc + WORDSIZE;
 	    }
@@ -5726,19 +5727,19 @@ void fct_srl() {
 	        print((int*) ",");
 	        printRegister(rt);
 	        print((int*) ",");
-	        print(itoa(signExtend(immediate), string_buffer, 10, 0, 0));
+	        print(itoa(signExtend(shamt), string_buffer, 10, 0, 0));
 	        if (interpret) {
 	            print((int*) ": ");
 	            printRegister(rt);
 	            print((int*) "=");
-	            print(itoa(*(registers+rs), string_buffer, 10, 0, 0));
+	            print(itoa(*(registers+rt), string_buffer, 10, 0, 0));
 	            print((int*) ",shamt=");
-	            print(itoa(signExtend(immediate), string_buffer, 10, 0, 0));
+	            print(itoa(signExtend(shamt), string_buffer, 10, 0, 0));
 	        }
 	    }
 
 		    if (interpret) {
-		        *(registers+rd) = rightShift(*(registers+rt), immediate);
+		        *(registers+rd) = rightShift(*(registers+rt), shamt);
 
 		        pc = pc + WORDSIZE;
 		    }
@@ -5930,7 +5931,7 @@ void execute() {
 
     if (opcode == OP_SPECIAL) {
         if (function == FCT_NOP){
-        	if(immediate > 0)
+        	if(shamt > 0)
         		fct_sll();
         	else
         		fct_nop();
