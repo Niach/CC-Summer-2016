@@ -2814,6 +2814,11 @@ int gr_shiftExpression(){
 	        getSymbol();
 
 	        if(symbol == SYM_INTEGER){
+	        	rtype = INT_T;
+
+	        	if (ltype != rtype)
+	        		typeWarning(ltype, rtype);
+
 		        if (operatorSymbol == SYM_LS) {
 		        	emitRFormat(OP_SPECIAL, currentTemporary(), 0, currentTemporary(), literal, FCT_NOP);
 
@@ -2829,8 +2834,7 @@ int gr_shiftExpression(){
 
 	        }else{
 	        	rtype = gr_simpleExpression();
-	        	if (ltype != rtype)
-	        		typeWarning(ltype, rtype);
+
 
 
 
