@@ -6532,13 +6532,13 @@ void boot(int argc, int *argv) {
 int selfie(int argc, int* argv) {
 
 	int x;
-	int y;
-	y = 2;
+	//int y;
+	//y = 2;
 	x = 100;
-	x = x >> y;
+	x = x >> 2;
 	print(itoa(x, string_buffer, 10, 0, 0));
 	println();
-    x = x << y;
+    x = x << 2;
     print(itoa(x, string_buffer, 10, 0, 0));
     println();
       
