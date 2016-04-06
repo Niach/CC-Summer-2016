@@ -2819,11 +2819,13 @@ int gr_shiftExpression(){
 
 		            tfree(1);
 
-		        } else if (operatorSymbol == SYM_RS) {
+		        } else {
 		            emitRFormat(OP_SPECIAL, currentTemporary(), 0, currentTemporary(), literal, FCT_SRL);
 
 		            tfree(1);
 		        }
+
+		        getSymbol();
 
 	        }else{
 	        	rtype = gr_simpleExpression();
