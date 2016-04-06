@@ -2799,7 +2799,7 @@ int gr_simpleExpression() {
 }
 
 int gr_shiftExpression(){
-	int ltype;
+		int ltype;
 	    int operatorSymbol;
 	    int rtype;
 
@@ -2818,7 +2818,7 @@ int gr_shiftExpression(){
 	            typeWarning(ltype, rtype);
 
 	        if (operatorSymbol == SYM_LS) {
-	        	emitRFormat(OP_SPECIAL, previousTemporary(), currentTemporary(), previousTemporary(), FCT_SLL);
+	        	emitRFormat(OP_SPECIAL, previousTemporary(), currentTemporary(), previousTemporary(), FCT_NOP);
 
 	            tfree(1);
 
@@ -5688,14 +5688,12 @@ void fct_sll() {
 	        print((int*) " ");
 	        printRegister(rd);
 	        print((int*) ",");
-	        printRegister(rs);
-	        print((int*) ",");
 	        printRegister(rt);
 	        if (interpret) {
 	            print((int*) ": ");
-	            printRegister(rs);
+	            printRegister(rd);
 	            print((int*) "=");
-	            print(itoa(*(registers+rs), string_buffer, 10, 0, 0));
+	            print(itoa(*(registers+rd), string_buffer, 10, 0, 0));
 	            print((int*) ",");
 	            printRegister(rt);
 	            print((int*) "=");
@@ -5764,18 +5762,22 @@ void fct_sllv() {
 		        print((int*) " ");
 		        printRegister(rd);
 		        print((int*) ",");
-		        printRegister(rs);
-		        print((int*) ",");
 		        printRegister(rt);
+		        print((int*) ",");
+		        printRegister(rs);
 		        if (interpret) {
 		            print((int*) ": ");
-		            printRegister(rs);
+		            printRegister(rd);
 		            print((int*) "=");
-		            print(itoa(*(registers+rs), string_buffer, 10, 0, 0));
+		            print(itoa(*(registers+rd), string_buffer, 10, 0, 0));
 		            print((int*) ",");
 		            printRegister(rt);
 		            print((int*) "=");
 		            print(itoa(*(registers+rt), string_buffer, 10, 0, 0));
+		            print((int*) ",");
+		            printRegister(rs);
+		            print((int*) "=");
+		            print(itoa(*(registers+rs), string_buffer, 10, 0, 0));
 		        }
 		    }
 
@@ -5802,18 +5804,22 @@ void fct_srlv() {
 		        print((int*) " ");
 		        printRegister(rd);
 		        print((int*) ",");
-		        printRegister(rs);
-		        print((int*) ",");
 		        printRegister(rt);
+		        print((int*) ",");
+		        printRegister(rs);
 		        if (interpret) {
 		            print((int*) ": ");
-		            printRegister(rs);
+		            printRegister(rd);
 		            print((int*) "=");
-		            print(itoa(*(registers+rs), string_buffer, 10, 0, 0));
+		            print(itoa(*(registers+rd), string_buffer, 10, 0, 0));
 		            print((int*) ",");
 		            printRegister(rt);
 		            print((int*) "=");
 		            print(itoa(*(registers+rt), string_buffer, 10, 0, 0));
+		            print((int*) ",");
+		            printRegister(rs);
+		            print((int*) "=");
+		            print(itoa(*(registers+rs), string_buffer, 10, 0, 0));
 		        }
 		    }
 
