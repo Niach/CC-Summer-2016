@@ -5779,27 +5779,27 @@ void fct_sllv() {
 		        print((int*) " ");
 		        printRegister(rd);
 		        print((int*) ",");
-		        printRegister(rt);
-		        print((int*) ",");
 		        printRegister(rs);
+		        print((int*) ",");
+		        printRegister(rt);
 		        if (interpret) {
 		            print((int*) ": ");
 		            printRegister(rd);
 		            print((int*) "=");
 		            print(itoa(*(registers+rd), string_buffer, 10, 0, 0));
 		            print((int*) ",");
-		            printRegister(rt);
-		            print((int*) "=");
-		            print(itoa(*(registers+rt), string_buffer, 10, 0, 0));
-		            print((int*) ",");
 		            printRegister(rs);
 		            print((int*) "=");
 		            print(itoa(*(registers+rs), string_buffer, 10, 0, 0));
+		            print((int*) ",");
+		            printRegister(rt);
+		            print((int*) "=");
+		            print(itoa(*(registers+rt), string_buffer, 10, 0, 0));
 		        }
 		    }
 
 		    if (interpret) {
-		        *(registers+rd) = leftShift(*(registers+rt), *(registers+rs));
+		        *(registers+rd) = leftShift(*(registers+rs), *(registers+rt));
 
 		        pc = pc + WORDSIZE;
 		    }
@@ -5821,27 +5821,27 @@ void fct_srlv() {
 		        print((int*) " ");
 		        printRegister(rd);
 		        print((int*) ",");
-		        printRegister(rt);
-		        print((int*) ",");
 		        printRegister(rs);
+		        print((int*) ",");
+		        printRegister(rt);
 		        if (interpret) {
 		            print((int*) ": ");
 		            printRegister(rd);
 		            print((int*) "=");
 		            print(itoa(*(registers+rd), string_buffer, 10, 0, 0));
 		            print((int*) ",");
-		            printRegister(rt);
-		            print((int*) "=");
-		            print(itoa(*(registers+rt), string_buffer, 10, 0, 0));
-		            print((int*) ",");
 		            printRegister(rs);
 		            print((int*) "=");
 		            print(itoa(*(registers+rs), string_buffer, 10, 0, 0));
+		            print((int*) ",");
+		            printRegister(rt);
+		            print((int*) "=");
+		            print(itoa(*(registers+rt), string_buffer, 10, 0, 0));
 		        }
 		    }
 
 		    if (interpret) {
-		        *(registers+rd) = rightShift(*(registers+rt), *(registers+rs));
+		        *(registers+rd) = rightShift(*(registers+rs), *(registers+rt));
 
 		        pc = pc + WORDSIZE;
 		    }
@@ -6548,11 +6548,15 @@ void boot(int argc, int *argv) {
 int selfie(int argc, int* argv) {
 
 	int x;
+	int y;
+	y = 2;
 	x = 100;
-	x = x >> 2;
+	x = x >> y;
 	print(itoa(x, string_buffer, 10, 0, 0));
 	println();
-
+    x = x << y;
+    print(itoa(x, string_buffer, 10, 0, 0));
+    println();
       
     if (argc < 2)
         return -1;
