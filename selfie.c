@@ -2845,6 +2845,7 @@ int gr_shiftExpression(){
 		        }
 
 
+	        }
 	    }
 	    return ltype;
 }
@@ -5743,6 +5744,8 @@ void fct_srl() {
 	        printRegister(rd);
 	        print((int*) ",");
 	        printRegister(rt);
+	        print((int*) ",");
+	        printRegister(rs);
 	        print((int*) ",");
 	        print(itoa(signExtend(shamt), string_buffer, 10, 0, 0));
 	        if (interpret) {
