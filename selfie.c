@@ -5707,21 +5707,21 @@ void fct_sll() {
 	        print((int*) " ");
 	        printRegister(rd);
 	        print((int*) ",");
-	        printRegister(rt);
+	        printRegister(rs);
 	        print((int*) ",");
 	        print(itoa(signExtend(shamt), string_buffer, 10, 0, 0));
 	        if (interpret) {
 	            print((int*) ": ");
-	            printRegister(rt);
+	            printRegister(rs);
 	            print((int*) "=");
-	            print(itoa(*(registers+rt), string_buffer, 10, 0, 0));
+	            print(itoa(*(registers+rs), string_buffer, 10, 0, 0));
 	            print((int*) ",shamt=");
 	            print(itoa(signExtend(shamt), string_buffer, 10, 0, 0));
 	        }
 	    }
 
 	    if (interpret) {
-	        *(registers+rd) = leftShift(*(registers+rt), shamt);
+	        *(registers+rd) = leftShift(*(registers+rs), shamt);
 
 	        pc = pc + WORDSIZE;
 	    }
@@ -5743,23 +5743,21 @@ void fct_srl() {
 	        print((int*) " ");
 	        printRegister(rd);
 	        print((int*) ",");
-	        printRegister(rt);
-	        print((int*) ",");
 	        printRegister(rs);
 	        print((int*) ",");
 	        print(itoa(signExtend(shamt), string_buffer, 10, 0, 0));
 	        if (interpret) {
 	            print((int*) ": ");
-	            printRegister(rt);
+	            printRegister(rs);
 	            print((int*) "=");
-	            print(itoa(*(registers+rt), string_buffer, 10, 0, 0));
+	            print(itoa(*(registers+rs), string_buffer, 10, 0, 0));
 	            print((int*) ",shamt=");
 	            print(itoa(signExtend(shamt), string_buffer, 10, 0, 0));
 	        }
 	    }
 
 		    if (interpret) {
-		        *(registers+rd) = rightShift(*(registers+rt), shamt);
+		        *(registers+rd) = rightShift(*(registers+rs), shamt);
 
 		        pc = pc + WORDSIZE;
 		    }
@@ -6554,6 +6552,7 @@ int selfie(int argc, int* argv) {
 	x = x >> 2;
 	print(itoa(x, string_buffer, 10, 0, 0));
 	println();
+
       
     if (argc < 2)
         return -1;
