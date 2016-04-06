@@ -654,7 +654,6 @@ int rs          = 0;
 int rt          = 0;
 int rd          = 0;
 int immediate   = 0;
-int shamt 		= 0;
 int function    = 0;
 int instr_index = 0;
 
@@ -2819,7 +2818,7 @@ int gr_shiftExpression(){
 	            typeWarning(ltype, rtype);
 
 	        if (operatorSymbol == SYM_LS) {
-	        	emitRFormat(OP_SPECIAL, previousTemporary(), currentTemporary(), previousTemporary(), FCT_NOP);
+	        	emitRFormat(OP_SPECIAL, previousTemporary(), currentTemporary(), previousTemporary(), FCT_SLL);
 
 	            tfree(1);
 
@@ -5705,7 +5704,7 @@ void fct_sll() {
 	    }
 
 	    if (interpret) {
-	        *(registers+rd) = leftShift(*(registers+rs), immediate);
+	        *(registers+rd) = leftShift(*(registers+rt), immediate);
 
 	        pc = pc + WORDSIZE;
 	    }
@@ -5722,7 +5721,7 @@ void fct_sll() {
 }
 
 void fct_srl() {
-		if (debug) {
+	if (debug) {
 		        printFunction(function);
 		        print((int*) " ");
 		        printRegister(rd);
@@ -5743,7 +5742,7 @@ void fct_srl() {
 		    }
 
 		    if (interpret) {
-		        *(registers+rd) = rightShift(*(registers+rs), immediate);
+		        *(registers+rd) = rightShift(*(registers+rt), immediate);
 
 		        pc = pc + WORDSIZE;
 		    }
@@ -6653,7 +6652,6 @@ int selfie(int argc, int* argv) {
 }
 
 int main(int argc, int *argv) {
-	int x;
     initLibrary();
 
     initScanner();
@@ -6670,16 +6668,6 @@ int main(int argc, int *argv) {
     
     print((int*) "This is BeTheCompiler Selfie");
     println();
-
-
-    x = 100;
-    x = x << 1;
-    print(itoa(x, string_buffer, 10, 0, 0));
-    println();
-    x = x >> 1;
-    print(itoa(x, string_buffer, 10, 0, 0));
-    println();
-
 
     if (selfie(argc, (int*) argv) != 0) {
         print(selfieName);
