@@ -270,6 +270,8 @@ int SYM_NOTEQ        = 24; // !=
 int SYM_MOD          = 25; // %
 int SYM_CHARACTER    = 26; // character
 int SYM_STRING       = 27; // string
+int SYM_LS			 = 28; // <<
+int SYM_RS           = 29; // >>
 
 int *SYMBOLS; // array of strings representing symbols
 
@@ -301,7 +303,7 @@ int sourceFD    = 0;        // file descriptor of open source file
 // ------------------------- INITIALIZATION ------------------------
 
 void initScanner () {
-    SYMBOLS = malloc(28 * SIZEOFINTSTAR);
+    SYMBOLS = malloc(30 * SIZEOFINTSTAR);
 
     *(SYMBOLS + SYM_IDENTIFIER)   = (int) "identifier";
     *(SYMBOLS + SYM_INTEGER)      = (int) "integer";
@@ -331,7 +333,8 @@ void initScanner () {
     *(SYMBOLS + SYM_MOD)          = (int) "%";
     *(SYMBOLS + SYM_CHARACTER)    = (int) "character";
     *(SYMBOLS + SYM_STRING)       = (int) "string";
-
+    *(SYMBOLS + SYM_LS)			  = (int) "<<";
+ 	*(SYMBOLS + SYM_RS)           = (int) ">>";
     character = CHAR_EOF;
     symbol    = SYM_EOF;
 }
@@ -453,6 +456,7 @@ void help_procedure_epilogue(int parameters);
 int  gr_call(int *procedure);
 int  gr_factor();
 int  gr_term();
+int  gr_shiftExpression();
 int  gr_simpleExpression();
 int  gr_expression();
 void gr_while();
@@ -1887,8 +1891,10 @@ int getSymbol() {
             getCharacter();
 
             symbol = SYM_LEQ;
-        } else
-            symbol = SYM_LT;
+        } else if(character == CHAR_LT){
+        	getCharacter();
+        	symbol = SYM_LS;
+        }else symbol = SYM_LT;
 
     } else if (character == CHAR_GT) {
         getCharacter();
@@ -1897,6 +1903,9 @@ int getSymbol() {
             getCharacter();
 
             symbol = SYM_GEQ;
+        } else if(character == CHAR_GT){
+        	getCharacter();
+        	symbol = SYM_RS;
         } else
             symbol = SYM_GT;
 
@@ -2108,6 +2117,15 @@ int isComparison() {
         return 1;
     else
         return 0;
+}
+
+int isShift(){
+	if(symbol == SYM_LS)
+		return 1;
+	else if(symbol == SYM_RS)
+		return 1;
+	else return 0;
+
 }
 
 int lookForFactor() {
@@ -2780,6 +2798,39 @@ int gr_simpleExpression() {
     return ltype;
 }
 
+int gr_shiftExpression(){
+	int ltype;
+	    int operatorSymbol;
+	    int rtype;
+
+	    ltype = gr_simpleExpression();
+
+
+	    //optional: << >>
+	    if (isShift()) {
+	        operatorSymbol = symbol;
+
+	        getSymbol();
+
+	        rtype = gr_simpleExpression();
+
+	        if (ltype != rtype)
+	            typeWarning(ltype, rtype);
+
+	        if (operatorSymbol == SYM_LS) {
+	        	emitRFormat(OP_SPECIAL, previousTemporary(), currentTemporary(), previousTemporary(), FCT_SLL)
+
+	            tfree(1);
+
+	        } else if (operatorSymbol == SYM_RS) {
+	            emitRFormat(OP_SPECIAL, previousTemporary(), currentTemporary(), previousTemporary(), FCT_SRL);
+
+	            tfree(1);
+	        }
+	    }
+	    return ltype;
+}
+
 int gr_expression() {
     int ltype;
     int operatorSymbol;
@@ -2787,7 +2838,7 @@ int gr_expression() {
 
     // assert: n = allocatedTemporaries
 
-    ltype = gr_simpleExpression();
+    ltype = gr_shiftExpression();
 
     // assert: allocatedTemporaries == n + 1
 
@@ -2797,7 +2848,7 @@ int gr_expression() {
 
         getSymbol();
 
-        rtype = gr_simpleExpression();
+        rtype = gr_shiftExpression();
 
         // assert: allocatedTemporaries == n + 2
 
