@@ -5689,15 +5689,15 @@ void fct_sll() {
 	        printRegister(rd);
 	        print((int*) ",");
 	        printRegister(rt);
+	        print((int*) ",");
+	        print(itoa(signExtend(immediate), string_buffer, 10, 0, 0));
 	        if (interpret) {
 	            print((int*) ": ");
-	            printRegister(rd);
-	            print((int*) "=");
-	            print(itoa(*(registers+rd), string_buffer, 10, 0, 0));
-	            print((int*) ",");
 	            printRegister(rt);
 	            print((int*) "=");
-	            print(itoa(*(registers+rt), string_buffer, 10, 0, 0));
+	            print(itoa(*(registers+rs), string_buffer, 10, 0, 0));
+	            print((int*) ",shamt=");
+	            print(itoa(signExtend(immediate), string_buffer, 10, 0, 0));
 	        }
 	    }
 
@@ -5720,24 +5720,22 @@ void fct_sll() {
 
 void fct_srl() {
 	if (debug) {
-		        printFunction(function);
-		        print((int*) " ");
-		        printRegister(rd);
-		        print((int*) ",");
-		        printRegister(rs);
-		        print((int*) ",");
-		        printRegister(rt);
-		        if (interpret) {
-		            print((int*) ": ");
-		            printRegister(rs);
-		            print((int*) "=");
-		            print(itoa(*(registers+rs), string_buffer, 10, 0, 0));
-		            print((int*) ",");
-		            printRegister(rt);
-		            print((int*) "=");
-		            print(itoa(*(registers+rt), string_buffer, 10, 0, 0));
-		        }
-		    }
+	        printFunction(function);
+	        print((int*) " ");
+	        printRegister(rd);
+	        print((int*) ",");
+	        printRegister(rt);
+	        print((int*) ",");
+	        print(itoa(signExtend(immediate), string_buffer, 10, 0, 0));
+	        if (interpret) {
+	            print((int*) ": ");
+	            printRegister(rt);
+	            print((int*) "=");
+	            print(itoa(*(registers+rs), string_buffer, 10, 0, 0));
+	            print((int*) ",shamt=");
+	            print(itoa(signExtend(immediate), string_buffer, 10, 0, 0));
+	        }
+	    }
 
 		    if (interpret) {
 		        *(registers+rd) = rightShift(*(registers+rt), immediate);
