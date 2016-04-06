@@ -2822,24 +2822,27 @@ int gr_shiftExpression(){
 		        if (operatorSymbol == SYM_LS) {
 		        	emitRFormat(OP_SPECIAL, currentTemporary(), 0, currentTemporary(), literal, FCT_NOP);
 
-		            tfree(1);
 
 		        } else {
 		            emitRFormat(OP_SPECIAL, currentTemporary(), 0, currentTemporary(), literal, FCT_SRL);
 
-		            tfree(1);
 		        }
 
 		        getSymbol();
 
 	        }else{
 	        	rtype = gr_simpleExpression();
+	        	if (ltype != rtype)
+	        		typeWarning(ltype, rtype);
+
+		        if (operatorSymbol == SYM_LS) {
+		        	emitRFormat(OP_SPECIAL, previousTemporary(), currentTemporary(), previousTemporary(), 0, FCT_SLLV);
 
 
+		        } else {
+		            emitRFormat(OP_SPECIAL, previousTemporary(), currentTemporary(), previousTemporary(), 0, FCT_SRLV);
 
-
-	        }
-
+		        }
 
 
 	    }
