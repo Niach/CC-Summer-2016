@@ -589,7 +589,7 @@ void initRegister() {
 // ---------------------------- ENCODER ----------------------------
 // -----------------------------------------------------------------
 
-int encodeRFormat(int opcode, int rs, int rt, int rd, int function);
+int encodeRFormat(int opcode, int rs, int rt, int rd, int shamt, int function);
 int encodeIFormat(int opcode, int rs, int rt, int immediate);
 int encodeJFormat(int opcode, int instr_index);
 
@@ -699,7 +699,7 @@ void storeBinary(int baddr, int instruction);
 void storeInstruction(int baddr, int instruction);
 
 void emitInstruction(int instruction);
-void emitRFormat(int opcode, int rs, int rt, int rd, int function);
+void emitRFormat(int opcode, int rs, int rt, int rd, int shamt, int function);
 void emitIFormat(int opcode, int rs, int rt, int immediate);
 void emitJFormat(int opcode, int instr_index);
 
@@ -2451,7 +2451,7 @@ void help_procedure_epilogue(int parameters) {
     emitIFormat(OP_ADDIU, REG_SP, REG_SP, (parameters + 1) * WORDSIZE);
 
     // return
-    emitRFormat(OP_SPECIAL, REG_RA, 0, 0, FCT_JR);
+    emitRFormat(OP_SPECIAL, REG_RA, 0, 0, 0, FCT_JR);
 }
 
 int gr_call(int *procedure) {
@@ -2701,16 +2701,16 @@ int gr_term() {
             typeWarning(ltype, rtype);
 
         if (operatorSymbol == SYM_ASTERISK) {
-            emitRFormat(OP_SPECIAL, previousTemporary(), currentTemporary(), 0, FCT_MULTU);
-            emitRFormat(OP_SPECIAL, 0, 0, previousTemporary(), FCT_MFLO);
+            emitRFormat(OP_SPECIAL, previousTemporary(), currentTemporary(), 0, 0, FCT_MULTU);
+            emitRFormat(OP_SPECIAL, 0, 0, previousTemporary(), 0, FCT_MFLO);
 
         } else if (operatorSymbol == SYM_DIV) {
-            emitRFormat(OP_SPECIAL, previousTemporary(), currentTemporary(), 0, FCT_DIVU);
-            emitRFormat(OP_SPECIAL, 0, 0, previousTemporary(), FCT_MFLO);
+            emitRFormat(OP_SPECIAL, previousTemporary(), currentTemporary(), 0, 0, FCT_DIVU);
+            emitRFormat(OP_SPECIAL, 0, 0, previousTemporary(), 0, FCT_MFLO);
 
         } else if (operatorSymbol == SYM_MOD) {
-            emitRFormat(OP_SPECIAL, previousTemporary(), currentTemporary(), 0, FCT_DIVU);
-            emitRFormat(OP_SPECIAL, 0, 0, previousTemporary(), FCT_MFHI);
+            emitRFormat(OP_SPECIAL, previousTemporary(), currentTemporary(), 0, 0, FCT_DIVU);
+            emitRFormat(OP_SPECIAL, 0, 0, previousTemporary(), 0, FCT_MFHI);
         }
 
         tfree(1);
@@ -2761,7 +2761,7 @@ int gr_simpleExpression() {
             ltype = INT_T;
         }
 
-        emitRFormat(OP_SPECIAL, REG_ZR, currentTemporary(), currentTemporary(), FCT_SUBU);
+        emitRFormat(OP_SPECIAL, REG_ZR, currentTemporary(), currentTemporary(),0 , FCT_SUBU);
     }
 
     // + or -?
@@ -2782,13 +2782,13 @@ int gr_simpleExpression() {
             } else if (rtype == INTSTAR_T)
                 typeWarning(ltype, rtype);
 
-            emitRFormat(OP_SPECIAL, previousTemporary(), currentTemporary(), previousTemporary(), FCT_ADDU);
+            emitRFormat(OP_SPECIAL, previousTemporary(), currentTemporary(), previousTemporary(), 0, FCT_ADDU);
 
         } else if (operatorSymbol == SYM_MINUS) {
             if (ltype != rtype)
                 typeWarning(ltype, rtype);
 
-            emitRFormat(OP_SPECIAL, previousTemporary(), currentTemporary(), previousTemporary(), FCT_SUBU);
+            emitRFormat(OP_SPECIAL, previousTemporary(), currentTemporary(), previousTemporary(),0 , FCT_SUBU);
         }
 
         tfree(1);
@@ -2808,26 +2808,34 @@ int gr_shiftExpression(){
 
 
 	    //optional: << >>
-	    if (isShift()) {
+	    while (isShift()) {
 	        operatorSymbol = symbol;
 
 	        getSymbol();
 
-	        rtype = gr_simpleExpression();
+	        if(symbol == SYM_INTEGER){
+		        if (operatorSymbol == SYM_LS) {
+		        	emitRFormat(OP_SPECIAL, currentTemporary(), 0, currentTemporary(), literal, FCT_NOP);
 
-	        if (ltype != rtype)
-	            typeWarning(ltype, rtype);
+		            tfree(1);
 
-	        if (operatorSymbol == SYM_LS) {
-	        	emitRFormat(OP_SPECIAL, previousTemporary(), currentTemporary(), previousTemporary(), FCT_NOP);
+		        } else if (operatorSymbol == SYM_RS) {
+		            emitRFormat(OP_SPECIAL, currentTemporary(), 0, currentTemporary(), literal, FCT_SRL);
 
-	            tfree(1);
+		            tfree(1);
+		        }
 
-	        } else if (operatorSymbol == SYM_RS) {
-	            emitRFormat(OP_SPECIAL, previousTemporary(), currentTemporary(), previousTemporary(), FCT_SRL);
+	        }else{
+	        	rtype = gr_simpleExpression();
+	        	if (ltype != rtype)
+	        		typeWarning(ltype, rtype);
 
-	            tfree(1);
+
+
 	        }
+
+
+
 	    }
 	    return ltype;
 }
@@ -2858,7 +2866,7 @@ int gr_expression() {
 
         if (operatorSymbol == SYM_EQUALITY) {
             // subtract, if result = 0 then 1, else 0
-            emitRFormat(OP_SPECIAL, previousTemporary(), currentTemporary(), previousTemporary(), FCT_SUBU);
+            emitRFormat(OP_SPECIAL, previousTemporary(), currentTemporary(), previousTemporary(),0 , FCT_SUBU);
 
             tfree(1);
 
@@ -2869,7 +2877,7 @@ int gr_expression() {
 
         } else if (operatorSymbol == SYM_NOTEQ) {
             // subtract, if result = 0 then 0, else 1
-            emitRFormat(OP_SPECIAL, previousTemporary(), currentTemporary(), previousTemporary(), FCT_SUBU);
+            emitRFormat(OP_SPECIAL, previousTemporary(), currentTemporary(), previousTemporary(),0 , FCT_SUBU);
 
             tfree(1);
 
@@ -2880,19 +2888,19 @@ int gr_expression() {
 
         } else if (operatorSymbol == SYM_LT) {
             // set to 1 if a < b, else 0
-            emitRFormat(OP_SPECIAL, previousTemporary(), currentTemporary(), previousTemporary(), FCT_SLT);
+            emitRFormat(OP_SPECIAL, previousTemporary(), currentTemporary(), previousTemporary(),0 , FCT_SLT);
 
             tfree(1);
 
         } else if (operatorSymbol == SYM_GT) {
             // set to 1 if b < a, else 0
-            emitRFormat(OP_SPECIAL, currentTemporary(), previousTemporary(), previousTemporary(), FCT_SLT);
+            emitRFormat(OP_SPECIAL, currentTemporary(), previousTemporary(), previousTemporary(), 0, FCT_SLT);
 
             tfree(1);
 
         } else if (operatorSymbol == SYM_LEQ) {
             // if b < a set 0, else 1
-            emitRFormat(OP_SPECIAL, currentTemporary(), previousTemporary(), previousTemporary(), FCT_SLT);
+            emitRFormat(OP_SPECIAL, currentTemporary(), previousTemporary(), previousTemporary(),0 , FCT_SLT);
 
             tfree(1);
 
@@ -2903,7 +2911,7 @@ int gr_expression() {
 
         } else if (operatorSymbol == SYM_GEQ) {
             // if a < b set 0, else 1
-            emitRFormat(OP_SPECIAL, previousTemporary(), currentTemporary(), previousTemporary(), FCT_SLT);
+            emitRFormat(OP_SPECIAL, previousTemporary(), currentTemporary(), previousTemporary(),0 , FCT_SLT);
 
             tfree(1);
 
@@ -3093,7 +3101,7 @@ void gr_return(int returnType) {
             typeWarning(returnType, type);
 
         // save value of expression in return register
-        emitRFormat(OP_SPECIAL, REG_ZR, currentTemporary(), REG_V0, FCT_ADDU);
+        emitRFormat(OP_SPECIAL, REG_ZR, currentTemporary(), REG_V0, 0,FCT_ADDU);
         
         tfree(1);
     }
@@ -3569,8 +3577,8 @@ void emitLeftShiftBy(int b) {
 
     // load multiplication factor less than 2^15 to avoid sign extension
     emitIFormat(OP_ADDIU, REG_ZR, nextTemporary(), twoToThePowerOf(b));
-    emitRFormat(OP_SPECIAL, currentTemporary(), nextTemporary(), 0, FCT_MULTU);
-    emitRFormat(OP_SPECIAL, 0, 0, currentTemporary(), FCT_MFLO);
+    emitRFormat(OP_SPECIAL, currentTemporary(), nextTemporary(), 0, 0, FCT_MULTU);
+    emitRFormat(OP_SPECIAL, 0, 0, currentTemporary(), 0, FCT_MFLO);
 }
 
 void emitMainEntry() {
@@ -3589,7 +3597,7 @@ void emitMainEntry() {
     // since we load positive integers < 2^28 which take
     // no more than 8 instructions each, see load_integer
     while (i < 16) {
-        emitRFormat(OP_SPECIAL, 0, 0, 0, FCT_NOP);
+        emitRFormat(OP_SPECIAL, 0, 0, 0, 0, FCT_NOP);
 
         i = i + 1;
     }
@@ -3738,16 +3746,16 @@ void printRegister(int reg) {
 // 32 bit
 //
 // +------+-----+-----+-----+-----+------+
-// |opcode|  rs |  rt |  rd |00000|fction|
+// |opcode|  rs |  rt |  rd |shamt|fction|
 // +------+-----+-----+-----+-----+------+
 //    6      5     5     5     5     6
-int encodeRFormat(int opcode, int rs, int rt, int rd, int function) {
+int encodeRFormat(int opcode, int rs, int rt, int rd, int shamt, int function) {
     // assert: 0 <= opcode < 2^6
     // assert: 0 <= rs < 2^5
     // assert: 0 <= rt < 2^5
     // assert: 0 <= rd < 2^5
     // assert: 0 <= function < 2^6
-    return leftShift(leftShift(leftShift(leftShift(opcode, 5) + rs, 5) + rt, 5) + rd, 11) + function;
+    return leftShift(leftShift(leftShift(leftShift(leftShift(opcode, 5) + rs, 5) + rt, 5) + rd, 5) + shamt, 6)+ function;
 }
 
 // -----------------------------------------------------------------
@@ -3925,20 +3933,20 @@ void emitInstruction(int instruction) {
     }
 }
 
-void emitRFormat(int opcode, int rs, int rt, int rd, int function) {
-    emitInstruction(encodeRFormat(opcode, rs, rt, rd, function));
+void emitRFormat(int opcode, int rs, int rt, int rd, int shamt, int function) {
+    emitInstruction(encodeRFormat(opcode, rs, rt, rd, shamt, function));
 
     if (opcode == OP_SPECIAL) {
         if (function == FCT_JR)
-            emitRFormat(OP_SPECIAL, 0, 0, 0, FCT_NOP); // delay slot
+            emitRFormat(OP_SPECIAL, 0, 0, 0, 0, FCT_NOP); // delay slot
         else if (function == FCT_MFLO) {
             // In MIPS I-III two instructions after MFLO/MFHI
             // must not modify the LO/HI registers
-            emitRFormat(OP_SPECIAL, 0, 0, 0, FCT_NOP); // pipeline delay
-            emitRFormat(OP_SPECIAL, 0, 0, 0, FCT_NOP); // pipeline delay
+            emitRFormat(OP_SPECIAL, 0, 0, 0, 0, FCT_NOP); // pipeline delay
+            emitRFormat(OP_SPECIAL, 0, 0, 0, 0, FCT_NOP); // pipeline delay
         } else if (function == FCT_MFHI) {
-            emitRFormat(OP_SPECIAL, 0, 0, 0, FCT_NOP); // pipeline delay
-            emitRFormat(OP_SPECIAL, 0, 0, 0, FCT_NOP); // pipeline delay
+            emitRFormat(OP_SPECIAL, 0, 0, 0, 0, FCT_NOP); // pipeline delay
+            emitRFormat(OP_SPECIAL, 0, 0, 0, 0, FCT_NOP); // pipeline delay
         }
     }
 }
@@ -3947,15 +3955,15 @@ void emitIFormat(int opcode, int rs, int rt, int immediate) {
     emitInstruction(encodeIFormat(opcode, rs, rt, immediate));
 
     if (opcode == OP_BEQ)
-        emitRFormat(OP_SPECIAL, 0, 0, 0, FCT_NOP); // delay slot
+        emitRFormat(OP_SPECIAL, 0, 0, 0, 0, FCT_NOP); // delay slot
     else if (opcode == OP_BNE)
-        emitRFormat(OP_SPECIAL, 0, 0, 0, FCT_NOP); // delay slot
+        emitRFormat(OP_SPECIAL, 0, 0, 0, 0, FCT_NOP); // delay slot
 }
 
 void emitJFormat(int opcode, int instr_index) {
     emitInstruction(encodeJFormat(opcode, instr_index));
 
-    emitRFormat(OP_SPECIAL, 0, 0, 0, FCT_NOP); // delay slot
+    emitRFormat(OP_SPECIAL, 0, 0, 0, 0, FCT_NOP); // delay slot
 }
 
 void fixup_relative(int fromAddress) {
@@ -4169,7 +4177,7 @@ void emitExit() {
 
     // load the correct syscall number and invoke syscall
     emitIFormat(OP_ADDIU, REG_ZR, REG_V0, SYSCALL_EXIT);
-    emitRFormat(0, 0, 0, 0, FCT_SYSCALL);
+    emitRFormat(0, 0, 0, 0, 0,FCT_SYSCALL);
 
     // never returns here
 }
@@ -4196,10 +4204,10 @@ void emitRead() {
     emitIFormat(OP_ADDIU, REG_SP, REG_SP, WORDSIZE);
 
     emitIFormat(OP_ADDIU, REG_ZR, REG_V0, SYSCALL_READ);
-    emitRFormat(OP_SPECIAL, 0, 0, 0, FCT_SYSCALL);
+    emitRFormat(OP_SPECIAL, 0, 0, 0, 0, FCT_SYSCALL);
 
     // jump back to caller, return value is in REG_V0
-    emitRFormat(OP_SPECIAL, REG_RA, 0, 0, FCT_JR);
+    emitRFormat(OP_SPECIAL, REG_RA, 0, 0, 0, FCT_JR);
 }
 
 void implementRead() {
@@ -4313,9 +4321,9 @@ void emitWrite() {
     emitIFormat(OP_ADDIU, REG_SP, REG_SP, WORDSIZE);
 
     emitIFormat(OP_ADDIU, REG_ZR, REG_V0, SYSCALL_WRITE);
-    emitRFormat(OP_SPECIAL, 0, 0, 0, FCT_SYSCALL);
+    emitRFormat(OP_SPECIAL, 0, 0, 0, 0, FCT_SYSCALL);
 
-    emitRFormat(OP_SPECIAL, REG_RA, 0, 0, FCT_JR);
+    emitRFormat(OP_SPECIAL, REG_RA, 0, 0, 0, FCT_JR);
 }
 
 void implementWrite() {
@@ -4429,9 +4437,9 @@ void emitOpen() {
     emitIFormat(OP_ADDIU, REG_SP, REG_SP, WORDSIZE);
 
     emitIFormat(OP_ADDIU, REG_ZR, REG_V0, SYSCALL_OPEN);
-    emitRFormat(OP_SPECIAL, 0, 0, 0, FCT_SYSCALL);
+    emitRFormat(OP_SPECIAL, 0, 0, 0, 0, FCT_SYSCALL);
 
-    emitRFormat(OP_SPECIAL, REG_RA, 0, 0, FCT_JR);
+    emitRFormat(OP_SPECIAL, REG_RA, 0, 0, 0, FCT_JR);
 }
 
 int down_loadString(int *table, int vaddr, int *s) {
@@ -4529,9 +4537,9 @@ void emitMalloc() {
     emitIFormat(OP_ADDIU, REG_SP, REG_SP, WORDSIZE);
 
     emitIFormat(OP_ADDIU, REG_ZR, REG_V0, SYSCALL_MALLOC);
-    emitRFormat(OP_SPECIAL, 0, 0, 0, FCT_SYSCALL);
+    emitRFormat(OP_SPECIAL, 0, 0, 0, 0, FCT_SYSCALL);
 
-    emitRFormat(OP_SPECIAL, REG_RA, 0, 0, FCT_JR);
+    emitRFormat(OP_SPECIAL, REG_RA, 0, 0, 0, FCT_JR);
 }
 
 void implementMalloc() {
@@ -4579,9 +4587,9 @@ void emitPutchar() {
     emitIFormat(OP_ADDIU, REG_ZR, REG_A0, 1); // stdout file descriptor
 
     emitIFormat(OP_ADDIU, REG_ZR, REG_V0, SYSCALL_WRITE);
-    emitRFormat(OP_SPECIAL, 0, 0, 0, FCT_SYSCALL);
+    emitRFormat(OP_SPECIAL, 0, 0, 0, 0, FCT_SYSCALL);
 
-    emitRFormat(OP_SPECIAL, REG_RA, 0, 0, FCT_JR);
+    emitRFormat(OP_SPECIAL, REG_RA, 0, 0, 0, FCT_JR);
 }
 
 // -----------------------------------------------------------------
@@ -4593,9 +4601,9 @@ void emitID() {
     createSymbolTableEntry(LIBRARY_TABLE, (int*) "hypster_ID", 0, PROCEDURE, INT_T, 0, binaryLength);
 
     emitIFormat(OP_ADDIU, REG_ZR, REG_V0, SYSCALL_ID);
-    emitRFormat(OP_SPECIAL, 0, 0, 0, FCT_SYSCALL);
+    emitRFormat(OP_SPECIAL, 0, 0, 0, 0, FCT_SYSCALL);
 
-    emitRFormat(OP_SPECIAL, REG_RA, 0, 0, FCT_JR);
+    emitRFormat(OP_SPECIAL, REG_RA, 0, 0, 0, FCT_JR);
 }
 
 void implementID() {
@@ -4619,9 +4627,9 @@ void emitCreate() {
     createSymbolTableEntry(LIBRARY_TABLE, (int*) "hypster_create", 0, PROCEDURE, INT_T, 0, binaryLength);
 
     emitIFormat(OP_ADDIU, REG_ZR, REG_V0, SYSCALL_CREATE);
-    emitRFormat(OP_SPECIAL, 0, 0, 0, FCT_SYSCALL);
+    emitRFormat(OP_SPECIAL, 0, 0, 0, 0, FCT_SYSCALL);
 
-    emitRFormat(OP_SPECIAL, REG_RA, 0, 0, FCT_JR);
+    emitRFormat(OP_SPECIAL, REG_RA, 0, 0, 0, FCT_JR);
 }
 
 int doCreate(int parentID) {
@@ -4674,12 +4682,12 @@ void emitSwitch() {
     emitIFormat(OP_ADDIU, REG_SP, REG_SP, WORDSIZE);
 
     emitIFormat(OP_ADDIU, REG_ZR, REG_V0, SYSCALL_SWITCH);
-    emitRFormat(OP_SPECIAL, 0, 0, 0, FCT_SYSCALL);
+    emitRFormat(OP_SPECIAL, 0, 0, 0, 0, FCT_SYSCALL);
 
     // save ID of context from which we are switching here in return register
-    emitRFormat(OP_SPECIAL, REG_ZR, REG_V1, REG_V0, FCT_ADDU);
+    emitRFormat(OP_SPECIAL, REG_ZR, REG_V1, REG_V0, 0, FCT_ADDU);
 
-    emitRFormat(OP_SPECIAL, REG_RA, 0, 0, FCT_JR);
+    emitRFormat(OP_SPECIAL, REG_RA, 0, 0, 0, FCT_JR);
 }
 
 int doSwitch(int toID) {
@@ -4752,9 +4760,9 @@ void emitStatus() {
     createSymbolTableEntry(LIBRARY_TABLE, (int*) "hypster_status", 0, PROCEDURE, INT_T, 0, binaryLength);
 
     emitIFormat(OP_ADDIU, REG_ZR, REG_V0, SYSCALL_STATUS);
-    emitRFormat(OP_SPECIAL, 0, 0, 0, FCT_SYSCALL);
+    emitRFormat(OP_SPECIAL, 0, 0, 0, 0, FCT_SYSCALL);
 
-    emitRFormat(OP_SPECIAL, REG_RA, 0, 0, FCT_JR);
+    emitRFormat(OP_SPECIAL, REG_RA, 0, 0, 0, FCT_JR);
 }
 
 int doStatus() {
@@ -4798,9 +4806,9 @@ void emitDelete() {
     emitIFormat(OP_ADDIU, REG_SP, REG_SP, WORDSIZE);
 
     emitIFormat(OP_ADDIU, REG_ZR, REG_V0, SYSCALL_DELETE);
-    emitRFormat(OP_SPECIAL, 0, 0, 0, FCT_SYSCALL);
+    emitRFormat(OP_SPECIAL, 0, 0, 0, 0, FCT_SYSCALL);
 
-    emitRFormat(OP_SPECIAL, REG_RA, 0, 0, FCT_JR);
+    emitRFormat(OP_SPECIAL, REG_RA, 0, 0, 0, FCT_JR);
 }
 
 void doDelete(int ID) {
@@ -4856,9 +4864,9 @@ void emitMap() {
     emitIFormat(OP_ADDIU, REG_SP, REG_SP, WORDSIZE);
 
     emitIFormat(OP_ADDIU, REG_ZR, REG_V0, SYSCALL_MAP);
-    emitRFormat(OP_SPECIAL, 0, 0, 0, FCT_SYSCALL);
+    emitRFormat(OP_SPECIAL, 0, 0, 0, 0, FCT_SYSCALL);
 
-    emitRFormat(OP_SPECIAL, REG_RA, 0, 0, FCT_JR);
+    emitRFormat(OP_SPECIAL, REG_RA, 0, 0, 0, FCT_JR);
 }
 
 void doMap(int ID, int page, int frame) {
