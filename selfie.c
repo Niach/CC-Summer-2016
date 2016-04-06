@@ -6531,14 +6531,13 @@ void boot(int argc, int *argv) {
 
 int selfie(int argc, int* argv) {
 
+	//Shift Testing
 	int x;
-	//int y;
-	//y = 2;
-	x = 100;
-	x = x >> 2;
+	x = 400;
+	x = x >> 2 >> 2;
 	print(itoa(x, string_buffer, 10, 0, 0));
 	println();
-    x = x << 2;
+    x = x << 2 << 2;
     print(itoa(x, string_buffer, 10, 0, 0));
     println();
       
