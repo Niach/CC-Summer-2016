@@ -1185,7 +1185,7 @@ int leftShift(int n, int b) {
     if (b > 30)
         return 0;
     else
-        return n * twoToThePowerOf(b);
+    	return n << b;
 }
 
 int rightShift(int n, int b) {
@@ -1194,12 +1194,12 @@ int rightShift(int n, int b) {
     if (b > 30)
         return 0;
     else if (n >= 0)
-        return n / twoToThePowerOf(b);
+        return n >> b;
     else
         // works even if n == INT_MIN:
         // shift right n with msb reset and then restore msb
-        return ((n + 1) + INT_MAX) / twoToThePowerOf(b) +
-            (INT_MAX / twoToThePowerOf(b) + 1);
+        return (((n + 1) + INT_MAX) >> b) +
+            ((INT_MAX >> b) + 1);
 }
 
 int loadCharacter(int *s, int i) {
