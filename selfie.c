@@ -427,6 +427,48 @@ void resetSymbolTables() {
   library_symbol_table = (int*) 0;
 }
 
+
+
+// -----------------------------------------------------------------
+// -----------------------CONSTANT FOLDING -------------------------
+// -----------------------------------------------------------------
+
+// cfAttribute:
+// +----+---------+
+// |  0 | isSet?  | set to 1 if the value is set, otherwise 0
+// |  1 | value   | int Value
+// +----+---------+
+
+int* createCfAttribute(){
+	return malloc(SIZEOFINTSTAR + (SIZEOFINT * 2));
+}
+
+int isCfSet(int* cfAttribute){
+	return *cfAttribute;
+}
+
+int getCfVal(int* cfAttribute){
+	return *(cfAttribute + 1);
+}
+
+
+void setCf(int* cfAttribute, int isSet){
+	*(cfAttribute) = isSet;
+}
+void setCfVal(int* cfAttribute, int newVal){
+	*(cfAttribute + 1) = newVal;
+}
+
+int and(int a, int b){
+	if(a){
+		if(b){
+			return 1;
+		}
+		return 0;
+	}
+	return 0;
+}
+
 // -----------------------------------------------------------------
 // ---------------------------- PARSER -----------------------------
 // -----------------------------------------------------------------
@@ -454,16 +496,17 @@ int* getVariable(int* variable);
 int  load_variable(int* variable);
 void load_integer(int value);
 void load_string(int* string);
+void load_cf_val(int val);
 
 int  help_call_codegen(int* entry, int* procedure);
 void help_procedure_prologue(int localVariables);
 void help_procedure_epilogue(int parameters);
 
 int  gr_call(int* procedure);
-int  gr_factor();
-int  gr_term();
-int  gr_shiftExpression();
-int  gr_simpleExpression();
+int  gr_factor(int* cfAttribute);
+int  gr_term(int* cfAttribute);
+int  gr_shiftExpression(int* cfAttribute);
+int  gr_simpleExpression(int* cfAttribute);
 int  gr_expression();
 void gr_while();
 void gr_if();
@@ -724,7 +767,7 @@ void selfie_load();
 
 // ------------------------ GLOBAL CONSTANTS -----------------------
 
-int maxBinaryLength = 131072; // 128KB
+int maxBinaryLength = 262144; // 256KB
 
 // ------------------------ GLOBAL VARIABLES -----------------------
 
@@ -2390,6 +2433,16 @@ void load_string(int* string) {
   emitIFormat(OP_ADDIU, REG_GP, currentTemporary(), -allocatedMemory);
 }
 
+void load_cf_val(int val){
+	if(val>= 0)
+		load_integer(val);
+	else {
+		load_integer(-val);
+		emitRFormat(OP_SPECIAL, REG_ZR, currentTemporary(), currentTemporary(), FCT_SUBU);
+	}
+
+}
+
 int help_call_codegen(int* entry, int* procedure) {
   int type;
 
@@ -2532,12 +2585,15 @@ int gr_call(int* procedure) {
   return type;
 }
 
-int gr_factor() {
+int gr_factor(int* cfAttribute) {
   int hasCast;
   int cast;
   int type;
 
   int* variableOrProcedureName;
+
+  setCf(cfAttribute, 0);
+  setCfVal(cfAttribute, 0);
 
   // assert: n = allocatedTemporaries
 
@@ -2640,7 +2696,8 @@ int gr_factor() {
 
   // integer?
   } else if (symbol == SYM_INTEGER) {
-    load_integer(literal);
+	  setCf(cfAttribute, 1);
+	  setCfVal(cfAttribute, literal);
 
     getSymbol();
 
@@ -2685,14 +2742,21 @@ int gr_factor() {
     return type;
 }
 
-int gr_term() {
+int gr_term(int* cfAttribute) {
   int ltype;
   int operatorSymbol;
   int rtype;
 
   // assert: n = allocatedTemporaries
+  int leftCfVal;
+  int leftCfSet;
 
-  ltype = gr_factor();
+  ltype = gr_factor(cfAttribute);
+
+
+
+  leftCfSet = isCfSet(cfAttribute);
+  leftCfVal = getCfVal(cfAttribute);
 
   // assert: allocatedTemporaries == n + 1
 
@@ -2702,27 +2766,85 @@ int gr_term() {
 
     getSymbol();
 
-    rtype = gr_factor();
+    setCf(cfAttribute, 0);
+    rtype = gr_factor(cfAttribute);
 
     // assert: allocatedTemporaries == n + 2
 
     if (ltype != rtype)
       typeWarning(ltype, rtype);
 
-    if (operatorSymbol == SYM_ASTERISK) {
-      emitRFormat(OP_SPECIAL, previousTemporary(), currentTemporary(), 0, FCT_MULTU);
-      emitRFormat(OP_SPECIAL, 0, 0, previousTemporary(), FCT_MFLO);
 
-    } else if (operatorSymbol == SYM_DIV) {
-      emitRFormat(OP_SPECIAL, previousTemporary(), currentTemporary(), 0, FCT_DIVU);
-      emitRFormat(OP_SPECIAL, 0, 0, previousTemporary(), FCT_MFLO);
+    if(and(leftCfSet, isCfSet(cfAttribute))){
 
-    } else if (operatorSymbol == SYM_MOD) {
-      emitRFormat(OP_SPECIAL, previousTemporary(), currentTemporary(), 0, FCT_DIVU);
-      emitRFormat(OP_SPECIAL, 0, 0, previousTemporary(), FCT_MFHI);
+    	if(operatorSymbol == SYM_ASTERISK){
+    		leftCfVal = leftCfVal * getCfVal(cfAttribute);
+    	}else if(operatorSymbol == SYM_DIV){
+    		leftCfVal = leftCfVal / getCfVal(cfAttribute);
+    	}else if(operatorSymbol == SYM_MOD){
+    		leftCfVal = leftCfVal % getCfVal(cfAttribute);
+    	}
+    	setCfVal(cfAttribute, leftCfVal);
+    }else{
+    	if(leftCfSet){
+
+    		load_cf_val(leftCfVal);
+    		leftCfSet = 0;
+
+    		if (operatorSymbol == SYM_ASTERISK) {
+    			emitRFormat(OP_SPECIAL, currentTemporary(), previousTemporary(), 0, FCT_MULTU);
+    		    emitRFormat(OP_SPECIAL, 0, 0, previousTemporary(), FCT_MFLO);
+
+    		} else if (operatorSymbol == SYM_DIV) {
+    		    emitRFormat(OP_SPECIAL, currentTemporary(), previousTemporary(), 0, FCT_DIVU);
+    		    emitRFormat(OP_SPECIAL, 0, 0, previousTemporary(), FCT_MFLO);
+
+    		} else if (operatorSymbol == SYM_MOD) {
+    		    emitRFormat(OP_SPECIAL, currentTemporary(), previousTemporary(), 0, FCT_DIVU);
+    		    emitRFormat(OP_SPECIAL, 0, 0, previousTemporary(), FCT_MFHI);
+    		}
+
+
+
+    	}else if(isCfSet(cfAttribute)){
+
+    		load_cf_val(getCfVal(cfAttribute));
+    		setCf(cfAttribute, 0);
+
+    		if (operatorSymbol == SYM_ASTERISK) {
+    			emitRFormat(OP_SPECIAL, previousTemporary(), currentTemporary(), 0, FCT_MULTU);
+    		    emitRFormat(OP_SPECIAL, 0, 0, previousTemporary(), FCT_MFLO);
+
+    		} else if (operatorSymbol == SYM_DIV) {
+    			emitRFormat(OP_SPECIAL, previousTemporary(), currentTemporary(), 0, FCT_DIVU);
+    		    emitRFormat(OP_SPECIAL, 0, 0, previousTemporary(), FCT_MFLO);
+
+    		} else if (operatorSymbol == SYM_MOD) {
+    		    emitRFormat(OP_SPECIAL, previousTemporary(), currentTemporary(), 0, FCT_DIVU);
+    		    emitRFormat(OP_SPECIAL, 0, 0, previousTemporary(), FCT_MFHI);
+    		}
+
+    	}else{
+    		if (operatorSymbol == SYM_ASTERISK) {
+    			emitRFormat(OP_SPECIAL, previousTemporary(), currentTemporary(), 0, FCT_MULTU);
+    		    emitRFormat(OP_SPECIAL, 0, 0, previousTemporary(), FCT_MFLO);
+
+    		} else if (operatorSymbol == SYM_DIV) {
+    			emitRFormat(OP_SPECIAL, previousTemporary(), currentTemporary(), 0, FCT_DIVU);
+    		    emitRFormat(OP_SPECIAL, 0, 0, previousTemporary(), FCT_MFLO);
+
+    		} else if (operatorSymbol == SYM_MOD) {
+    		    emitRFormat(OP_SPECIAL, previousTemporary(), currentTemporary(), 0, FCT_DIVU);
+    		    emitRFormat(OP_SPECIAL, 0, 0, previousTemporary(), FCT_MFHI);
+    		}
+
+    	}
+    	tfree(1);
     }
 
-    tfree(1);
+
+
+
   }
 
   // assert: allocatedTemporaries == n + 1
@@ -2730,11 +2852,13 @@ int gr_term() {
   return ltype;
 }
 
-int gr_simpleExpression() {
+int gr_simpleExpression(int* cfAttribute) {
   int sign;
   int ltype;
   int operatorSymbol;
   int rtype;
+  int leftCfSet;
+  int leftCfVal;
 
   // assert: n = allocatedTemporaries
 
@@ -2759,7 +2883,10 @@ int gr_simpleExpression() {
   } else
     sign = 0;
 
-  ltype = gr_term();
+  ltype = gr_term(cfAttribute);
+
+  leftCfSet = isCfSet(cfAttribute);
+  leftCfVal = getCfVal(cfAttribute);
 
   // assert: allocatedTemporaries == n + 1
 
@@ -2770,7 +2897,11 @@ int gr_simpleExpression() {
       ltype = INT_T;
     }
 
-    emitRFormat(OP_SPECIAL, REG_ZR, currentTemporary(), currentTemporary(), FCT_SUBU);
+    if(leftCfSet){
+    	leftCfVal = -leftCfVal;
+    	setCfVal(cfAttribute, leftCfVal);
+    } else
+    	emitRFormat(OP_SPECIAL, REG_ZR, currentTemporary(), currentTemporary(), FCT_SUBU);
   }
 
   // + or -?
@@ -2779,28 +2910,71 @@ int gr_simpleExpression() {
 
     getSymbol();
 
-    rtype = gr_term();
+    setCf(cfAttribute, 0);
+    rtype = gr_term(cfAttribute);
+
+
 
     // assert: allocatedTemporaries == n + 2
 
-    if (operatorSymbol == SYM_PLUS) {
-      if (ltype == INTSTAR_T) {
-        if (rtype == INT_T)
-          // pointer arithmetic: factor of 2^2 of integer operand
-          emitLeftShiftBy(2);
-      } else if (rtype == INTSTAR_T)
-        typeWarning(ltype, rtype);
+    if(and(leftCfSet, isCfSet(cfAttribute))){
 
-      emitRFormat(OP_SPECIAL, previousTemporary(), currentTemporary(), previousTemporary(), FCT_ADDU);
+    	if(operatorSymbol == SYM_PLUS){
+    		leftCfVal = leftCfVal + getCfVal(cfAttribute);
+    	}else if(operatorSymbol == SYM_MINUS){
+    		leftCfVal = leftCfVal - getCfVal(cfAttribute);
+    	}
+    	setCfVal(cfAttribute, leftCfVal);
+    }else{
+    	if(leftCfSet){
+    		load_cf_val(leftCfVal);
+    		leftCfSet = 0;
 
-    } else if (operatorSymbol == SYM_MINUS) {
-      if (ltype != rtype)
-        typeWarning(ltype, rtype);
+    		if (ltype == INTSTAR_T) {
+    			if (rtype == INT_T)
+    				// pointer arithmetic: factor of 2^2 of integer operand
+    		    	emitLeftShiftBy(2);
+    		} else if (rtype == INTSTAR_T)
+    			typeWarning(ltype, rtype);
 
-      emitRFormat(OP_SPECIAL, previousTemporary(), currentTemporary(), previousTemporary(), FCT_SUBU);
+    		if(operatorSymbol == SYM_PLUS){
+
+    			emitRFormat(OP_SPECIAL, currentTemporary(), previousTemporary(), currentTemporary(), FCT_ADDU);
+    		}else if(operatorSymbol == SYM_MINUS){
+    			emitRFormat(OP_SPECIAL, currentTemporary(), previousTemporary(), currentTemporary(), FCT_SUBU);
+    		}
+
+    	} else if(isCfSet(cfAttribute)){
+    		load_cf_val(getCfVal(cfAttribute));
+    		setCf(cfAttribute, 0);
+
+    		if(operatorSymbol == SYM_PLUS){
+    			emitRFormat(OP_SPECIAL, previousTemporary(), currentTemporary(), previousTemporary(), FCT_ADDU);
+    		}else if(operatorSymbol == SYM_MINUS){
+    			emitRFormat(OP_SPECIAL, previousTemporary(), currentTemporary(), previousTemporary(), FCT_SUBU);
+    		}
+
+    	}else{
+    		 if (operatorSymbol == SYM_PLUS) {
+    		      if (ltype == INTSTAR_T) {
+    		        if (rtype == INT_T)
+    		          // pointer arithmetic: factor of 2^2 of integer operand
+    		          emitLeftShiftBy(2);
+    		      } else if (rtype == INTSTAR_T)
+    		        typeWarning(ltype, rtype);
+
+    		      emitRFormat(OP_SPECIAL, previousTemporary(), currentTemporary(), previousTemporary(), FCT_ADDU);
+
+    		 } else if (operatorSymbol == SYM_MINUS) {
+    		      if (ltype != rtype)
+    		        typeWarning(ltype, rtype);
+
+    		      emitRFormat(OP_SPECIAL, previousTemporary(), currentTemporary(), previousTemporary(), FCT_SUBU);
+    		 }
+    	}
+    	tfree(1);
     }
 
-    tfree(1);
   }
 
   // assert: allocatedTemporaries == n + 1
@@ -2808,12 +2982,17 @@ int gr_simpleExpression() {
   return ltype;
 }
 
-int gr_shiftExpression(){
+int gr_shiftExpression(int* cfAttribute){
 		int ltype;
 	    int operatorSymbol;
 	    int rtype;
+	    int leftCfSet;
+	    int leftCfVal;
 
-	    ltype = gr_simpleExpression();
+	    ltype = gr_simpleExpression(cfAttribute);
+
+	    leftCfSet = isCfSet(cfAttribute);
+	    leftCfVal = getCfVal(cfAttribute);
 
 
 	    //optional: << >>
@@ -2822,22 +3001,54 @@ int gr_shiftExpression(){
 
 	        getSymbol();
 
-	        rtype = gr_simpleExpression();
+	        setCf(cfAttribute, 0);
+	        rtype = gr_simpleExpression(cfAttribute);
 
 
 	        if (ltype != rtype)
 	        	typeWarning(ltype, rtype);
 
-		    if (operatorSymbol == SYM_LS) {
-		        emitRFormat(OP_SPECIAL, previousTemporary(), currentTemporary(), previousTemporary(), FCT_SLLV);
+	        if (and(leftCfSet, isCfSet(cfAttribute))){
+	        	//fold
+	        		if (operatorSymbol == SYM_LS) {
+	        			leftCfVal = leftCfVal << getCfVal(cfAttribute);
+	        		}else if (operatorSymbol == SYM_RS){
+	        			leftCfVal = leftCfVal >> getCfVal(cfAttribute);
+	        		}
+	        		setCfVal(cfAttribute, leftCfVal);
+
+	        }else{
+	        	if (leftCfSet){
+
+	        		load_cf_val(leftCfVal);
+
+	        		if (operatorSymbol == SYM_LS)
+	        			emitRFormat(OP_SPECIAL, currentTemporary(), previousTemporary(), currentTemporary(), FCT_SLLV);
+	        		else if (operatorSymbol == SYM_RS)
+	        			emitRFormat(OP_SPECIAL, currentTemporary(), previousTemporary(), currentTemporary(), FCT_SRLV);
+
+	        		setCf(cfAttribute, 0);
+	        	}else if(isCfSet(cfAttribute)){
+
+	        		load_cf_val(getCfVal(cfAttribute));
+
+	        		if (operatorSymbol == SYM_LS)
+	        			emitRFormat(OP_SPECIAL, previousTemporary(), currentTemporary(), previousTemporary(), FCT_SLLV);
+	        		else if (operatorSymbol == SYM_RS)
+	        			emitRFormat(OP_SPECIAL, previousTemporary(), currentTemporary(), previousTemporary(), FCT_SRLV);
+
+	        		setCf(cfAttribute, 0);
+	        	}else{
+	        	  if (operatorSymbol == SYM_LS) {
+	        	      emitRFormat(OP_SPECIAL, previousTemporary(), currentTemporary(), previousTemporary(), FCT_SLLV);
+	              } else {
+   			          emitRFormat(OP_SPECIAL, previousTemporary(), currentTemporary(), previousTemporary(), FCT_SRLV);
+	        	  }
+	        	}
+	        	tfree(1);
+	        }
 
 
-		    } else {
-		        emitRFormat(OP_SPECIAL, previousTemporary(), currentTemporary(), previousTemporary(), FCT_SRLV);
-
-		    }
-
-			tfree(1);
 	        }
 
 	    return ltype;
@@ -2847,10 +3058,19 @@ int gr_expression() {
   int ltype;
   int operatorSymbol;
   int rtype;
+  int* cfAttribute;
+
+  cfAttribute = createCfAttribute();
+
 
   // assert: n = allocatedTemporaries
 
-  ltype = gr_shiftExpression();
+  ltype = gr_shiftExpression(cfAttribute);
+
+  if(isCfSet(cfAttribute)){
+	  load_cf_val(getCfVal(cfAttribute));
+	  setCf(cfAttribute, 0);
+  }
 
   // assert: allocatedTemporaries == n + 1
 
@@ -2859,8 +3079,13 @@ int gr_expression() {
     operatorSymbol = symbol;
 
     getSymbol();
+    setCf(cfAttribute, 0);
+    rtype = gr_shiftExpression(cfAttribute);
+    if(isCfSet(cfAttribute)){
+    	  load_cf_val(getCfVal(cfAttribute));
+    	  setCf(cfAttribute, 0);
+      }
 
-    rtype = gr_shiftExpression();
 
     // assert: allocatedTemporaries == n + 2
 
@@ -6534,12 +6759,27 @@ int selfie(int argc, int* argv) {
 	//Shift Testing
 	int x;
 	x = 400;
-	x = x >> 2 >> 2;
+	x = x >> 2;
 	print(itoa(x, string_buffer, 10, 0, 0));
 	println();
-    x = x << 2 << 2;
+    x = x << 2;
     print(itoa(x, string_buffer, 10, 0, 0));
     println();
+
+    //constant folding testing
+    x = 10 >> 2;
+    x = 10 << 2;
+    x = 10 + 2;
+    x = 10 - 2;
+    x = 10 * 2;
+    x = 10 / 2;
+    x = 11 % 2;
+    x = 10000 >> 1 >> 1;
+    x = 10 << 1 << 1;
+    x = 10000 / 2 / 2 / 2;
+    x = 2 * 3 + 3 + 1 + 9;
+    x = 3 * 9 + 6 / 2;
+    x = 3 + 5 * 9;
 
   if (argc < 2)
     return -1;
