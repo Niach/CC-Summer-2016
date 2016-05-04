@@ -338,7 +338,7 @@ void initScanner () {
   *(SYMBOLS + SYM_MOD)          = (int) "%";
   *(SYMBOLS + SYM_CHARACTER)    = (int) "character";
   *(SYMBOLS + SYM_STRING)       = (int) "string";
-  *(SYMBOLS + SYM_LS)			= (int) "<<";
+  *(SYMBOLS + SYM_LS)			      = (int) "<<";
   *(SYMBOLS + SYM_RS)           = (int) ">>";
 
   character = CHAR_EOF;
@@ -1952,8 +1952,12 @@ int getSymbol() {
     } else if (character == CHAR_GT) {
         getCharacter();
 
-        if (character == CHAR_EQUAL) {
-            getCharacter();
+    if (character == CHAR_EQUAL) {
+      getCharacter();
+
+      symbol = SYM_GEQ;
+    } else
+      symbol = SYM_GT;
 
             symbol = SYM_GEQ;
         } else if(character == CHAR_GT){
@@ -2669,7 +2673,7 @@ int gr_factor(int* cfAttribute) {
     // dereference
     emitIFormat(OP_LW, currentTemporary(), currentTemporary(), 0);
 
-    type = INT_T;
+  type = INT_T;
 
   // identifier?
   } else if (symbol == SYM_IDENTIFIER) {
@@ -6846,6 +6850,52 @@ int selfie(int argc, int* argv) {
 
           mipster = 0;
         } else {
+          print(selfieName);
+          print((int*) ": nothing to run");
+          println();
+
+          exit(-1);
+        }
+
+        return 0;
+      } else if (stringCompare((int*) *argv, (int*) "-d")) {
+        initMemory(atoi((int*) *(argv+1)) * MEGABYTE);
+
+        argc = argc - 1;
+        argv = argv + 1;
+
+        // pass binaryName as first argument replacing size
+        *argv = (int) binaryName;
+
+        if (binaryLength > 0) {
+          mipster = 1;
+          debug   = 1;
+
+          selfie_run(argc, argv);
+
+          mipster = 0;
+          debug   = 0;
+        } else {
+          print(selfieName);
+          print((int*) ": nothing to debug");
+          println();
+
+          exit(-1);
+        }
+
+        return 0;
+      } else if (stringCompare((int*) *argv, (int*) "-y")) {
+        initMemory(atoi((int*) *(argv+1)) * MEGABYTE);
+
+        argc = argc - 1;
+        argv = argv + 1;
+
+        // pass binaryName as first argument replacing size
+        *argv = (int) binaryName;
+
+        if (binaryLength > 0)
+          selfie_run(argc, argv);
+        else {
           print(selfieName);
           print((int*) ": nothing to run");
           println();
