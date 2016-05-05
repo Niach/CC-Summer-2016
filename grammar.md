@@ -27,8 +27,8 @@ call             = identifier "(" [ expression { "," expression } ] ")" .
 
 literal          = integer | "'" ascii_character "'" .
 
-factor           = [ cast ] 
-                    ( [ "*" ] ( identifier | "(" expression ")" ) |
+factor           = [ cast ]
+                    ( [ "*" ] ( identifier [ "[" expression "]" ] | "(" expression ")" ) |
                       call |
                       literal |
                       """ { ascii_character } """ ) .
@@ -41,29 +41,29 @@ shiftExpression  = simpleExpression [ ( "<<" | ">>" ) simpleExpression ] .
 
 expression       = shiftExpression [ ( "==" | "!=" | "<" | ">" | "<=" | ">=" ) shiftExpression ] .
 
-while            = "while" "(" expression ")" 
+while            = "while" "(" expression ")"
                              ( statement |
                                "{" { statement } "}" ) .
 
-if               = "if" "(" expression ")" 
-                             ( statement | 
-                               "{" { statement } "}" ) 
+if               = "if" "(" expression ")"
+                             ( statement |
+                               "{" { statement } "}" )
                          [ "else"
                              ( statement |
                                "{" { statement } "}" ) ] .
 
 return           = "return" [ expression ] .
 
-statement        = ( [ "*" ] identifier | "*" "(" expression ")" ) "="
+statement        = ( [ "*" ] identifier [ "[" expression "]" ] | "*" "(" expression ")" ) "="
                       expression ";" |
-                    call ";" | 
-                    while | 
-                    if | 
+                    call ";" |
+                    while |
+                    if |
                     return ";" .
 
 variable         = type identifier .
 
-procedure        = "(" [ variable { "," variable } ] ")" 
+procedure        = "(" [ variable { "," variable } ] ")"
                     ( ";" | "{" { variable ";" } { statement } "}" ) .
 
 cstar            = { type identifier [ "=" [ cast ] [ "-" ] literal ] ";" |

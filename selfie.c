@@ -1956,14 +1956,10 @@ int getSymbol() {
       getCharacter();
 
       symbol = SYM_GEQ;
-    } else
-      symbol = SYM_GT;
-
-            symbol = SYM_GEQ;
-        } else if(character == CHAR_GT){
+    } else if(character == CHAR_GT){
         	getCharacter();
         	symbol = SYM_RS;
-        } else
+    } else
             symbol = SYM_GT;
 
     } else if (character == CHAR_EXCLAMATION) {
