@@ -20,13 +20,14 @@ test: selfie
 	diff -q selfie1.m selfie3.m
 	diff -q selfie1.s selfie3.s
 
-
+# Simple Tests
 simple: selfie
-    ./selfie -c selfie.c -o selfie.m
-    ./selfie -l selfie.m -m 1
+	./selfie -c selfie.c -o selfie.m
+	./selfie -l selfie.m -m 1
 
+# Write assembly
 assembly: selfie
-    ./selfie -c selfie.c -s selfie.s
+	./selfie -c selfie.c -s selfie.s
 
 # Clean up
 clean:
