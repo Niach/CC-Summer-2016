@@ -2948,6 +2948,13 @@ int gr_simpleExpression(int* cfAttribute) {
     		load_cf_val(getCfVal(cfAttribute));
     		setCf(cfAttribute, 0);
 
+        if (ltype == INTSTAR_T) {
+          if (rtype == INT_T)
+            // pointer arithmetic: factor of 2^2 of integer operand
+              emitLeftShiftBy(2);
+        } else if (rtype == INTSTAR_T)
+          typeWarning(ltype, rtype);
+
     		if(operatorSymbol == SYM_PLUS){
     			emitRFormat(OP_SPECIAL, previousTemporary(), currentTemporary(), previousTemporary(), FCT_ADDU);
     		}else if(operatorSymbol == SYM_MINUS){
@@ -6954,6 +6961,22 @@ int selfie(int argc, int* argv) {
   return 0;
 }
 
+void test(){
+    int* array;
+    int x;
+    array = malloc(8);
+
+    *array = 10;
+    *(array + 1) = 20;
+    x = *array;
+    print(itoa(x, string_buffer, 10, 0, 0));
+    println();
+
+    x = *(array + 1);
+    print(itoa(x, string_buffer, 10, 0, 0));
+    println();
+}
+
 int main(int argc, int* argv) {
   initLibrary();
 
@@ -6971,6 +6994,7 @@ int main(int argc, int* argv) {
 
   print((int*) "This is BeTheCompiler Selfie");
   println();
+  test();
 
   if (selfie(argc, (int*) argv) != 0) {
     print(selfieName);
