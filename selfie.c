@@ -342,7 +342,7 @@ void initScanner () {
   *(SYMBOLS + SYM_MOD)          = (int) "%";
   *(SYMBOLS + SYM_CHARACTER)    = (int) "character";
   *(SYMBOLS + SYM_STRING)       = (int) "string";
-  *(SYMBOLS + SYM_LS)			      = (int) "<<";
+  *(SYMBOLS + SYM_LS)			= (int) "<<";
   *(SYMBOLS + SYM_RS)           = (int) ">>";
   *(SYMBOLS + SYM_LBRACKET)     = (int) "[";
   *(SYMBOLS + SYM_RBRACKET)     = (int) "]";
@@ -381,6 +381,7 @@ int reportUndefinedProcedures();
 // |  5 | value   | VARIABLE: initial value
 // |  6 | address | VARIABLE: offset, PROCEDURE: address, STRING: offset
 // |  7 | scope   | REG_GP, REG_FP
+// |  8 | size    | Size
 // +----+---------+
 
 int* getNextEntry(int* entry)  { return (int*) *entry; }
@@ -391,6 +392,7 @@ int  getType(int* entry)       { return        *(entry + 4); }
 int  getValue(int* entry)      { return        *(entry + 5); }
 int  getAddress(int* entry)    { return        *(entry + 6); }
 int  getScope(int* entry)      { return        *(entry + 7); }
+int  getSize(int * entry)      { return        *(entry + 8); }
 
 void setNextEntry(int* entry, int* next)    { *entry       = (int) next; }
 void setString(int* entry, int* identifier) { *(entry + 1) = (int) identifier; }
@@ -400,6 +402,7 @@ void setType(int* entry, int type)          { *(entry + 4) = type; }
 void setValue(int* entry, int value)        { *(entry + 5) = value; }
 void setAddress(int* entry, int address)    { *(entry + 6) = address; }
 void setScope(int* entry, int scope)        { *(entry + 7) = scope; }
+void setSize(int* entry, int size)          { *(entry + 8) = size; }
 
 // ------------------------ GLOBAL CONSTANTS -----------------------
 
@@ -407,6 +410,7 @@ void setScope(int* entry, int scope)        { *(entry + 7) = scope; }
 int VARIABLE  = 1;
 int PROCEDURE = 2;
 int STRING    = 3;
+int ARRAY     = 4;
 
 // types
 int INT_T     = 1;
@@ -528,7 +532,7 @@ void gr_if(int* cfAttribute);
 void gr_return(int returnType, int* cfAttribute);
 void gr_statement(int* cfAttribute);
 int  gr_type();
-void gr_variable(int offset, int* cfAttribute);
+int gr_variable(int offset, int* cfAttribute);
 void gr_initialization(int* name, int offset, int type);
 void gr_procedure(int* procedure, int returnType, int* cfAttribute);
 void gr_cstar();
@@ -2022,7 +2026,7 @@ int getSymbol() {
 void createSymbolTableEntry(int whichTable, int* string, int line, int class, int type, int value, int address) {
   int* newEntry;
 
-  newEntry = malloc(2 * SIZEOFINTSTAR + 6 * SIZEOFINT);
+  newEntry = malloc(2 * SIZEOFINTSTAR + 7 * SIZEOFINT);
 
   setString(newEntry, string);
   setLineNumber(newEntry, line);
@@ -2070,6 +2074,12 @@ int* getSymbolTableEntry(int* string, int class) {
 
     if (entry != (int*) 0)
       return entry;
+  } else if (class == ARRAY) {
+	// local variables override global variables
+	entry = searchSymbolTable(local_symbol_table, string, class);
+
+	if (entry != (int*) 0)
+	   return entry;
   }
 
   return searchSymbolTable(global_symbol_table, string, class);
@@ -2379,12 +2389,16 @@ int* getVariable(int* variable) {
   entry = getSymbolTableEntry(variable, VARIABLE);
 
   if (entry == (int*) 0) {
-    printLineNumber((int*) "error", lineNumber);
-    print(variable);
-    print((int*) " undeclared");
-    println();
+	  entry = getSymbolTableEntry(variable, ARRAY);
+
+	  if (entry == (int*) 0) {
+		  printLineNumber((int*) "error", lineNumber);
+		  print(variable);
+		  print((int*) " undeclared");
+		  println();
 
     exit(-1);
+	  }
   }
 
   return entry;
@@ -2718,27 +2732,27 @@ int gr_factor(int* cfAttribute) {
     } else if(symbol == SYM_LBRACKET){
       getSymbol();
 
+      entry = getVariable(variableOrProcedureName);
+
       type = gr_expression(cfAttribute);
       emitLeftShiftBy(2);
 
       if(type != INT_T)
     	  typeWarning(INT_T, type);
 
-      type = load_variable(variableOrProcedureName);
-
-      if (type != INTSTAR_T)
-        typeWarning(INTSTAR_T, type);
+      //type = load_variable(variableOrProcedureName);
 
 
-      if(symbol == SYM_RBRACKET){
-    	  getSymbol();
-      } else {
-    	  syntaxErrorSymbol(SYM_RBRACKET);
-      }
+      if(symbol == SYM_RBRACKET)
+    	 getSymbol();
+      else
+    	 syntaxErrorSymbol(SYM_RBRACKET);
 
-      // add (express << 2) plus address of the element
-      emitRFormat(OP_SPECIAL, currentTemporary(), previousTemporary(), currentTemporary(), FCT_ADDU);
-      emitIFormat(OP_LW, currentTemporary(), currentTemporary(), 0);
+
+      // add (index << 2) plus address of the element
+      emitRFormat(OP_SPECIAL, currentTemporary(), getScope(entry), currentTemporary(), FCT_ADDU);
+
+      emitIFormat(OP_LW, currentTemporary(), currentTemporary(), getAddress(entry));
 
       type = INT_T;
     } else
@@ -3406,6 +3420,7 @@ void gr_statement(int* cfAttribute) {
   int* variableOrProcedureName;
   int* entry;
 
+
   // assert: allocatedTemporaries == 0;
 
   while (lookForStatement()) {
@@ -3486,7 +3501,7 @@ void gr_statement(int* cfAttribute) {
     } else
       syntaxErrorSymbol(SYM_LPARENTHESIS);
   }
-  // identifier "=" expression | call
+  // identifier [ "[" expression "]" ] "=" expression | call
   else if (symbol == SYM_IDENTIFIER) {
     variableOrProcedureName = identifier;
 
@@ -3506,7 +3521,50 @@ void gr_statement(int* cfAttribute) {
       else
         syntaxErrorSymbol(SYM_SEMICOLON);
 
-    // identifier = expression
+      // identifier [ "[" expression "]" ]
+    } else if (symbol == SYM_LBRACKET) {
+    	getSymbol();
+
+    	entry = getVariable(variableOrProcedureName);
+
+    	ltype = getType(entry);
+
+    	rtype = gr_expression(cfAttribute);
+
+    	if(rtype != INT_T)
+    		typeWarning(INT_T, rtype);
+
+    	if(symbol == SYM_RBRACKET)
+    		getSymbol();
+    	else
+    		syntaxErrorSymbol(SYM_RBRACKET);
+
+    	// store in current temporary: scope address + (arrayIndex << 2)
+    	emitLeftShiftBy(2);
+    	emitRFormat(OP_SPECIAL, currentTemporary(), getScope(entry), currentTemporary(), FCT_ADDU);
+
+    	// identifier [ "[" expression "]" ] = expression
+    	if(symbol == SYM_ASSIGN) {
+    		getSymbol();
+
+    	rtype = gr_expression(cfAttribute);
+
+    	if(rtype != ltype)
+    		typeWarning(ltype, rtype);
+
+    	// store word at array start address + scope address + (arrayIndex << 2)
+    	emitIFormat(OP_SW, previousTemporary(), currentTemporary(), getAddress(entry));
+
+    	tfree(2);
+    	} else
+    		syntaxErrorSymbol(SYM_ASSIGN);
+
+    	if(symbol == SYM_SEMICOLON)
+    		getSymbol();
+    	else
+    		syntaxErrorSymbol(SYM_SEMICOLON);
+
+      // identifier = expression
     } else if (symbol == SYM_ASSIGN) {
       entry = getVariable(variableOrProcedureName);
 
@@ -3570,9 +3628,11 @@ int gr_type() {
   return type;
 }
 
-void gr_variable(int offset, int* cfAttribute) {
+int gr_variable(int offset, int* cfAttribute) {
   int type;
   int indexType;
+  int* variableOrProcedureName;
+  int* entry;
 
   type = gr_type();
 
@@ -3583,7 +3643,15 @@ void gr_variable(int offset, int* cfAttribute) {
     if(symbol == SYM_LBRACKET){
       getSymbol();
 
+      variableOrProcedureName = identifier;
+
+      setCf(cfAttribute, 0);
+      setCfLoad(cfAttribute, 0);
+
       indexType = gr_expression(cfAttribute);
+      setCf(cfAttribute, 0);
+      setCfLoad(cfAttribute, 1);
+
 
       if(indexType != INT_T)
         typeWarning(INT_T, indexType);
@@ -3593,17 +3661,26 @@ void gr_variable(int offset, int* cfAttribute) {
       else
         syntaxErrorSymbol(SYM_RBRACKET);
 
-      createSymbolTableEntry(LOCAL_TABLE, identifier, lineNumber, VARIABLE, type, 0, offset);
+      offset = offset + WORDSIZE - getCfVal(cfAttribute) * SIZEOFINT;
+      createSymbolTableEntry(LOCAL_TABLE, variableOrProcedureName, lineNumber, ARRAY, type, 0, offset);
+      entry = getVariable(variableOrProcedureName);
+      //searchSymbolTable(local_symbol_table, variableOrProcedureName, ARRAY);
+      setSize(entry, getCfVal(cfAttribute));
+      offset = getCfVal(cfAttribute);
+      return offset;
 
     } else
     createSymbolTableEntry(LOCAL_TABLE, identifier, lineNumber, VARIABLE, type, 0, offset);
+    return 1;
 
 
   } else {
     syntaxErrorSymbol(SYM_IDENTIFIER);
 
     createSymbolTableEntry(LOCAL_TABLE, (int*) "missing variable name", lineNumber, VARIABLE, type, 0, offset);
+    return 1;
   }
+  return 1;
 }
 
 void gr_initialization(int* name, int offset, int type) {
@@ -3688,6 +3765,7 @@ void gr_procedure(int* procedure, int returnType, int* cfAttribute) {
   int localVariables;
   int functionStart;
   int* entry;
+  int offset;
 
   currentProcedureName = procedure;
 
@@ -3698,16 +3776,16 @@ void gr_procedure(int* procedure, int returnType, int* cfAttribute) {
     getSymbol();
 
     if (symbol != SYM_RPARENTHESIS) {
-      gr_variable(0, cfAttribute);
+      offset = gr_variable(0, cfAttribute);
 
       numberOfParameters = 1;
 
       while (symbol == SYM_COMMA) {
         getSymbol();
 
-        gr_variable(0, cfAttribute);
+        offset = gr_variable(0, cfAttribute);
 
-        numberOfParameters = numberOfParameters + 1;
+        numberOfParameters = numberOfParameters + offset;
       }
 
       entry = local_symbol_table;
@@ -3771,11 +3849,12 @@ void gr_procedure(int* procedure, int returnType, int* cfAttribute) {
     getSymbol();
 
     localVariables = 0;
+    offset = 0;
 
     while (symbol == SYM_INT) {
-      localVariables = localVariables + 1;
 
-      gr_variable(-localVariables * WORDSIZE, cfAttribute);
+      offset = gr_variable((-localVariables - 1) * WORDSIZE, cfAttribute);
+      localVariables = localVariables + offset;
 
       if (symbol == SYM_SEMICOLON)
         getSymbol();
@@ -7013,30 +7092,35 @@ int selfie(int argc, int* argv) {
 void test();
 
 void test(){
-  int* array;
-  int a[10];
-  int x;
-  array = malloc(4 * 31);
+	  //int* array;
+	  int testArray[10];
+	  int testArray2[33];
+	  int x;
+	  //array = malloc(4 * 31);
 
+	  //*array = 10;
+	  //*(array + 1) = 20;
+	  testArray2[30] = 333;
+	  testArray2[32] = 444;
 
-  *array = 33;
-  *(array + 30) = 1800;
+	  testArray[0] = 10;
+	  testArray[1] = 23;
 
-  x = *array;
-  print(itoa(x, string_buffer, 10, 0, 0));
-  println();
+	  x = testArray[0];
+	  print(itoa(x, string_buffer, 10, 0, 0));
+	  println();
 
-  x = *(array + 30) + 1;
-  print(itoa(x, string_buffer, 10, 0, 0));
-  println();
+	  x = testArray[1];
+	  print(itoa(x, string_buffer, 10, 0, 0));
+	  println();
 
-  x = array[0];
-  print(itoa(x, string_buffer, 10, 0, 0));
-  println();
+	  x = testArray2[30];
+	  print(itoa(x, string_buffer, 10, 0, 0));
+	  println();
 
-  x = array[30] + 1;
-  print(itoa(x, string_buffer, 10, 0, 0));
-  println();
+	  x = testArray2[32];
+	  print(itoa(x, string_buffer, 10, 0, 0));
+	  println();
 }
 
 int main(int argc, int* argv) {
