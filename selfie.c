@@ -2605,6 +2605,7 @@ int gr_factor(int* cfAttribute) {
   int hasCast;
   int cast;
   int type;
+  int* entry;
 
   int* variableOrProcedureName;
 
@@ -2706,6 +2707,34 @@ int gr_factor(int* cfAttribute) {
 
       // reset return register
       emitIFormat(OP_ADDIU, REG_ZR, REG_V0, 0);
+
+      //array access? identifier "[" expression "]"
+    } else if(symbol == SYM_LBRACKET){
+      getSymbol();
+
+      type = gr_expression();
+      emitLeftShiftBy(2);
+
+      if(type != INT_T)
+    	  typeWarning(INT_T, type);
+
+      type = load_variable(variableOrProcedureName);
+
+      if (type != INTSTAR_T)
+        typeWarning(INTSTAR_T, type);
+
+
+      if(symbol == SYM_RBRACKET){
+    	  getSymbol();
+      } else {
+    	  syntaxErrorSymbol(SYM_RBRACKET);
+      }
+
+      // add (express << 2) plus address of the element
+      emitRFormat(OP_SPECIAL, currentTemporary(), previousTemporary(), currentTemporary(), FCT_ADDU);
+      emitIFormat(OP_LW, currentTemporary(), currentTemporary(), 0);
+
+      type = INT_T;
     } else
       // variable access: identifier
       type = load_variable(variableOrProcedureName);
@@ -6779,31 +6808,6 @@ void boot(int argc, int* argv) {
 
 int selfie(int argc, int* argv) {
 
-	//Shift Testing
-	int x;
-	x = 400;
-	x = x >> 2;
-	print(itoa(x, string_buffer, 10, 0, 0));
-	println();
-    x = x << 2;
-    print(itoa(x, string_buffer, 10, 0, 0));
-    println();
-
-    //constant folding testing
-    x = 10 >> 2;
-    x = 10 << 2;
-    x = 10 + 2;
-    x = 10 - 2;
-    x = 10 * 2;
-    x = 10 / 2;
-    x = 11 % 2;
-    x = 10000 >> 1 >> 1;
-    x = 10 << 1 << 1;
-    x = 10000 / 2 / 2 / 2;
-    x = 2 * 3 + 3 + 1 + 9;
-    x = 3 * 9 + 6 / 2;
-    x = 3 + 5 * 9;
-
   if (argc < 2)
     return -1;
   else {
@@ -6977,20 +6981,33 @@ int selfie(int argc, int* argv) {
   return 0;
 }
 
+void test();
+
 void test(){
-    int* array;
-    int x;
-    array = malloc(8);
+  int* array;
 
-    *array = 10;
-    *(array + 1) = 20;
-    x = *array;
-    print(itoa(x, string_buffer, 10, 0, 0));
-    println();
+  int x;
+  array = malloc(4 * 31);
 
-    x = *(array + 1);
-    print(itoa(x, string_buffer, 10, 0, 0));
-    println();
+
+  *array = 33;
+  *(array + 30) = 1800;
+
+  x = *array;
+  print(itoa(x, string_buffer, 10, 0, 0));
+  println();
+
+  x = *(array + 30) + 1;
+  print(itoa(x, string_buffer, 10, 0, 0));
+  println();
+
+  x = array[0];
+  print(itoa(x, string_buffer, 10, 0, 0));
+  println();
+
+  x = array[30] + 1;
+  print(itoa(x, string_buffer, 10, 0, 0));
+  println();
 }
 
 int main(int argc, int* argv) {
