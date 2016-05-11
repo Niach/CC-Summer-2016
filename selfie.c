@@ -443,10 +443,11 @@ void resetSymbolTables() {
 // +----+---------+
 // |  0 | isSet?  | set to 1 if the value is set, otherwise 0
 // |  1 | value   | int Value
+// |  2 | load    | set to 1 if the value should be loaded
 // +----+---------+
 
 int* createCfAttribute(){
-	return malloc(SIZEOFINTSTAR + (SIZEOFINT * 2));
+	return malloc(SIZEOFINTSTAR + (SIZEOFINT * 3));
 }
 
 int isCfSet(int* cfAttribute){
@@ -457,12 +458,20 @@ int getCfVal(int* cfAttribute){
 	return *(cfAttribute + 1);
 }
 
+int getCfLoad(int* cfAttribute){
+	return *(cfAttribute + 2);
+}
+
 
 void setCf(int* cfAttribute, int isSet){
 	*(cfAttribute) = isSet;
 }
 void setCfVal(int* cfAttribute, int newVal){
 	*(cfAttribute + 1) = newVal;
+}
+
+void setCfLoad(int* cfAttribute, int load){
+	*(cfAttribute + 2) = load;
 }
 
 int and(int a, int b){
@@ -508,20 +517,20 @@ int  help_call_codegen(int* entry, int* procedure);
 void help_procedure_prologue(int localVariables);
 void help_procedure_epilogue(int parameters);
 
-int  gr_call(int* procedure);
+int  gr_call(int* procedure, int* cfAttribute);
 int  gr_factor(int* cfAttribute);
 int  gr_term(int* cfAttribute);
 int  gr_shiftExpression(int* cfAttribute);
 int  gr_simpleExpression(int* cfAttribute);
-int  gr_expression();
-void gr_while();
-void gr_if();
-void gr_return(int returnType);
-void gr_statement();
+int  gr_expression(int* cfAttribute);
+void gr_while(int* cfAttribute);
+void gr_if(int* cfAttribute);
+void gr_return(int returnType, int* cfAttribute);
+void gr_statement(int* cfAttribute);
 int  gr_type();
-void gr_variable(int offset);
+void gr_variable(int offset, int* cfAttribute);
 void gr_initialization(int* name, int offset, int type);
-void gr_procedure(int* procedure, int returnType);
+void gr_procedure(int* procedure, int returnType, int* cfAttribute);
 void gr_cstar();
 
 // ------------------------ GLOBAL VARIABLES -----------------------
@@ -2532,7 +2541,7 @@ void help_procedure_epilogue(int parameters) {
   emitRFormat(OP_SPECIAL, REG_RA, 0, 0, FCT_JR);
 }
 
-int gr_call(int* procedure) {
+int gr_call(int* procedure, int* cfAttribute) {
   int* entry;
   int numberOfTemporaries;
   int type;
@@ -2552,7 +2561,7 @@ int gr_call(int* procedure) {
   // assert: allocatedTemporaries == 0
 
   if (isExpression()) {
-    gr_expression();
+    gr_expression(cfAttribute);
 
     // TODO: check if types/number of parameters is correct
 
@@ -2565,7 +2574,7 @@ int gr_call(int* procedure) {
     while (symbol == SYM_COMMA) {
       getSymbol();
 
-      gr_expression();
+      gr_expression(cfAttribute);
 
       // push more parameters onto stack
       emitIFormat(OP_ADDIU, REG_SP, REG_SP, -WORDSIZE);
@@ -2609,9 +2618,6 @@ int gr_factor(int* cfAttribute) {
 
   int* variableOrProcedureName;
 
-  setCf(cfAttribute, 0);
-  setCfVal(cfAttribute, 0);
-
   // assert: n = allocatedTemporaries
 
   hasCast = 0;
@@ -2644,7 +2650,7 @@ int gr_factor(int* cfAttribute) {
 
     // not a cast: "(" expression ")"
     } else {
-      type = gr_expression();
+      type = gr_expression(cfAttribute);
 
       if (symbol == SYM_RPARENTHESIS)
         getSymbol();
@@ -2671,7 +2677,7 @@ int gr_factor(int* cfAttribute) {
     } else if (symbol == SYM_LPARENTHESIS) {
       getSymbol();
 
-      type = gr_expression();
+      type = gr_expression(cfAttribute);
 
       if (symbol == SYM_RPARENTHESIS)
         getSymbol();
@@ -2698,7 +2704,7 @@ int gr_factor(int* cfAttribute) {
       getSymbol();
 
       // function call: identifier "(" ... ")"
-      type = gr_call(variableOrProcedureName);
+      type = gr_call(variableOrProcedureName, cfAttribute);
 
       talloc();
 
@@ -2712,7 +2718,7 @@ int gr_factor(int* cfAttribute) {
     } else if(symbol == SYM_LBRACKET){
       getSymbol();
 
-      type = gr_expression();
+      type = gr_expression(cfAttribute);
       emitLeftShiftBy(2);
 
       if(type != INT_T)
@@ -2770,7 +2776,7 @@ int gr_factor(int* cfAttribute) {
   } else if (symbol == SYM_LPARENTHESIS) {
     getSymbol();
 
-    type = gr_expression();
+    type = gr_expression(cfAttribute);
 
     if (symbol == SYM_RPARENTHESIS)
       getSymbol();
@@ -3106,20 +3112,17 @@ int gr_shiftExpression(int* cfAttribute){
 	    return ltype;
 }
 
-int gr_expression() {
+int gr_expression(int* cfAttribute) {
   int ltype;
   int operatorSymbol;
   int rtype;
-  int* cfAttribute;
-
-  cfAttribute = createCfAttribute();
 
 
   // assert: n = allocatedTemporaries
 
   ltype = gr_shiftExpression(cfAttribute);
 
-  if(isCfSet(cfAttribute)){
+  if(and(isCfSet(cfAttribute), getCfLoad(cfAttribute))){
 	  load_cf_val(getCfVal(cfAttribute));
 	  setCf(cfAttribute, 0);
   }
@@ -3207,7 +3210,7 @@ int gr_expression() {
   return ltype;
 }
 
-void gr_while() {
+void gr_while(int* cfAttribute) {
   int brBackToWhile;
   int brForwardToEnd;
 
@@ -3224,7 +3227,7 @@ void gr_while() {
     if (symbol == SYM_LPARENTHESIS) {
       getSymbol();
 
-      gr_expression();
+      gr_expression(cfAttribute);
 
       // do not know where to branch, fixup later
       brForwardToEnd = binaryLength;
@@ -3241,7 +3244,7 @@ void gr_while() {
           getSymbol();
 
           while (isNotRbraceOrEOF())
-            gr_statement();
+            gr_statement(cfAttribute);
 
           if (symbol == SYM_RBRACE)
             getSymbol();
@@ -3253,7 +3256,7 @@ void gr_while() {
         }
         // only one statement without {}
         else
-          gr_statement();
+          gr_statement(cfAttribute);
       } else
         syntaxErrorSymbol(SYM_RPARENTHESIS);
     } else
@@ -3272,7 +3275,7 @@ void gr_while() {
   // assert: allocatedTemporaries == 0
 }
 
-void gr_if() {
+void gr_if(int* cfAttribute) {
   int brForwardToElseOrEnd;
   int brForwardToEnd;
 
@@ -3285,7 +3288,7 @@ void gr_if() {
     if (symbol == SYM_LPARENTHESIS) {
       getSymbol();
 
-      gr_expression();
+      gr_expression(cfAttribute);
 
       // if the "if" case is not true, we jump to "else" (if provided)
       brForwardToElseOrEnd = binaryLength;
@@ -3302,7 +3305,7 @@ void gr_if() {
           getSymbol();
 
           while (isNotRbraceOrEOF())
-            gr_statement();
+            gr_statement(cfAttribute);
 
           if (symbol == SYM_RBRACE)
             getSymbol();
@@ -3314,7 +3317,7 @@ void gr_if() {
         }
         // only one statement without {}
         else
-          gr_statement();
+          gr_statement(cfAttribute);
 
         //optional: else
         if (symbol == SYM_ELSE) {
@@ -3332,7 +3335,7 @@ void gr_if() {
             getSymbol();
 
             while (isNotRbraceOrEOF())
-              gr_statement();
+              gr_statement(cfAttribute);
 
             if (symbol == SYM_RBRACE)
               getSymbol();
@@ -3344,7 +3347,7 @@ void gr_if() {
 
           // only one statement without {}
           } else
-            gr_statement();
+            gr_statement(cfAttribute);
 
           // if the "if" case was true, we jump here
           fixup_relative(brForwardToEnd);
@@ -3361,7 +3364,7 @@ void gr_if() {
   // assert: allocatedTemporaries == 0
 }
 
-void gr_return(int returnType) {
+void gr_return(int returnType, int* cfAttribute) {
   int type;
 
   // assert: allocatedTemporaries == 0
@@ -3373,7 +3376,7 @@ void gr_return(int returnType) {
 
   // optional: expression
   if (symbol != SYM_SEMICOLON) {
-    type = gr_expression();
+    type = gr_expression(cfAttribute);
 
     if (returnType == VOID_T)
       typeWarning(type, returnType);
@@ -3397,7 +3400,7 @@ void gr_return(int returnType) {
   // assert: allocatedTemporaries == 0
 }
 
-void gr_statement() {
+void gr_statement(int* cfAttribute) {
   int ltype;
   int rtype;
   int* variableOrProcedureName;
@@ -3431,7 +3434,7 @@ void gr_statement() {
       if (symbol == SYM_ASSIGN) {
         getSymbol();
 
-        rtype = gr_expression();
+        rtype = gr_expression(cfAttribute);
 
         if (rtype != INT_T)
           typeWarning(INT_T, rtype);
@@ -3451,7 +3454,7 @@ void gr_statement() {
     } else if (symbol == SYM_LPARENTHESIS) {
       getSymbol();
 
-      ltype = gr_expression();
+      ltype = gr_expression(cfAttribute);
 
       if (ltype != INTSTAR_T)
         typeWarning(INTSTAR_T, ltype);
@@ -3463,7 +3466,7 @@ void gr_statement() {
         if (symbol == SYM_ASSIGN) {
           getSymbol();
 
-          rtype = gr_expression();
+          rtype = gr_expression(cfAttribute);
 
           if (rtype != INT_T)
             typeWarning(INT_T, rtype);
@@ -3493,7 +3496,7 @@ void gr_statement() {
     if (symbol == SYM_LPARENTHESIS) {
       getSymbol();
 
-      gr_call(variableOrProcedureName);
+      gr_call(variableOrProcedureName, cfAttribute);
 
       // reset return register
       emitIFormat(OP_ADDIU, REG_ZR, REG_V0, 0);
@@ -3511,7 +3514,7 @@ void gr_statement() {
 
       getSymbol();
 
-      rtype = gr_expression();
+      rtype = gr_expression(cfAttribute);
 
       if (ltype != rtype)
         typeWarning(ltype, rtype);
@@ -3529,17 +3532,17 @@ void gr_statement() {
   }
   // while statement?
   else if (symbol == SYM_WHILE) {
-    gr_while();
+    gr_while(cfAttribute);
   }
   // if statement?
   else if (symbol == SYM_IF) {
-    gr_if();
+    gr_if(cfAttribute);
   }
   // return statement?
   else if (symbol == SYM_RETURN) {
     entry = getSymbolTableEntry(currentProcedureName, PROCEDURE);
 
-    gr_return(getType(entry));
+    gr_return(getType(entry), cfAttribute);
 
     if (symbol == SYM_SEMICOLON)
       getSymbol();
@@ -3567,15 +3570,35 @@ int gr_type() {
   return type;
 }
 
-void gr_variable(int offset) {
+void gr_variable(int offset, int* cfAttribute) {
   int type;
+  int indexType;
 
   type = gr_type();
 
   if (symbol == SYM_IDENTIFIER) {
+    getSymbol();
+
+    // create Array
+    if(symbol == SYM_LBRACKET){
+      getSymbol();
+
+      indexType = gr_expression(cfAttribute);
+
+      if(indexType != INT_T)
+        typeWarning(INT_T, indexType);
+
+      if(symbol == SYM_RBRACKET)
+        getSymbol();
+      else
+        syntaxErrorSymbol(SYM_RBRACKET);
+
+      createSymbolTableEntry(LOCAL_TABLE, identifier, lineNumber, VARIABLE, type, 0, offset);
+
+    } else
     createSymbolTableEntry(LOCAL_TABLE, identifier, lineNumber, VARIABLE, type, 0, offset);
 
-    getSymbol();
+
   } else {
     syntaxErrorSymbol(SYM_IDENTIFIER);
 
@@ -3659,7 +3682,7 @@ void gr_initialization(int* name, int offset, int type) {
   createSymbolTableEntry(GLOBAL_TABLE, name, actualLineNumber, VARIABLE, type, initialValue, offset);
 }
 
-void gr_procedure(int* procedure, int returnType) {
+void gr_procedure(int* procedure, int returnType, int* cfAttribute) {
   int numberOfParameters;
   int parameters;
   int localVariables;
@@ -3675,14 +3698,14 @@ void gr_procedure(int* procedure, int returnType) {
     getSymbol();
 
     if (symbol != SYM_RPARENTHESIS) {
-      gr_variable(0);
+      gr_variable(0, cfAttribute);
 
       numberOfParameters = 1;
 
       while (symbol == SYM_COMMA) {
         getSymbol();
 
-        gr_variable(0);
+        gr_variable(0, cfAttribute);
 
         numberOfParameters = numberOfParameters + 1;
       }
@@ -3752,7 +3775,7 @@ void gr_procedure(int* procedure, int returnType) {
     while (symbol == SYM_INT) {
       localVariables = localVariables + 1;
 
-      gr_variable(-localVariables * WORDSIZE);
+      gr_variable(-localVariables * WORDSIZE, cfAttribute);
 
       if (symbol == SYM_SEMICOLON)
         getSymbol();
@@ -3766,7 +3789,7 @@ void gr_procedure(int* procedure, int returnType) {
     returnBranches = 0;
 
     while (isNotRbraceOrEOF())
-      gr_statement();
+      gr_statement(cfAttribute);
 
     if (symbol == SYM_RBRACE)
       getSymbol();
@@ -3794,6 +3817,12 @@ void gr_cstar() {
   int type;
   int* variableOrProcedureName;
 
+  int* cfAttribute;
+  cfAttribute = createCfAttribute();
+  setCf(cfAttribute, 0);
+  setCfVal(cfAttribute, 0);
+  setCfLoad(cfAttribute, 1);
+
   while (symbol != SYM_EOF) {
     while (lookForType()) {
       syntaxErrorUnexpected();
@@ -3815,7 +3844,7 @@ void gr_cstar() {
 
         getSymbol();
 
-        gr_procedure(variableOrProcedureName, type);
+        gr_procedure(variableOrProcedureName, type, cfAttribute);
       } else
         syntaxErrorSymbol(SYM_IDENTIFIER);
     } else {
@@ -3828,7 +3857,7 @@ void gr_cstar() {
 
         // type identifier "(" procedure declaration or definition
         if (symbol == SYM_LPARENTHESIS)
-          gr_procedure(variableOrProcedureName, type);
+          gr_procedure(variableOrProcedureName, type, cfAttribute);
         else {
           allocatedMemory = allocatedMemory + WORDSIZE;
 
@@ -6985,7 +7014,7 @@ void test();
 
 void test(){
   int* array;
-
+  int a[10];
   int x;
   array = malloc(4 * 31);
 

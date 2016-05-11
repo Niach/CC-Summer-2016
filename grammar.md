@@ -61,7 +61,7 @@ statement        = ( [ "*" ] identifier [ "[" expression "]" ] | "*" "(" express
                     if |
                     return ";" .
 
-variable         = type identifier .
+variable         = type identifier "[" [ expression ] "]".
 
 procedure        = "(" [ variable { "," variable } ] ")"
                     ( ";" | "{" { variable ";" } { statement } "}" ) .
