@@ -381,7 +381,7 @@ int reportUndefinedProcedures();
 // |  5 | value   | VARIABLE: initial value
 // |  6 | address | VARIABLE: offset, PROCEDURE: address, STRING: offset
 // |  7 | scope   | REG_GP, REG_FP
-// |  8 | size    | Size
+// |  8 | size    | Size in Byte
 // +----+---------+
 
 int* getNextEntry(int* entry)  { return (int*) *entry; }
@@ -3665,7 +3665,7 @@ int gr_variable(int offset, int* cfAttribute) {
       createSymbolTableEntry(LOCAL_TABLE, variableOrProcedureName, lineNumber, ARRAY, type, 0, offset);
       entry = getVariable(variableOrProcedureName);
       //searchSymbolTable(local_symbol_table, variableOrProcedureName, ARRAY);
-      setSize(entry, getCfVal(cfAttribute));
+      setSize(entry, SIZEOFINT * getCfVal(cfAttribute));
       offset = getCfVal(cfAttribute);
       return offset;
 
@@ -3935,9 +3935,35 @@ void gr_cstar() {
         getSymbol();
 
         // type identifier "(" procedure declaration or definition
-        if (symbol == SYM_LPARENTHESIS)
+        if (symbol == SYM_LPARENTHESIS) {
           gr_procedure(variableOrProcedureName, type, cfAttribute);
-        else {
+      } else if(symbol == SYM_LBRACKET) {
+    	  getSymbol();
+
+    	  setCf(cfAttribute, 0);
+    	  setCfLoad(cfAttribute, 0);
+
+    	  type = gr_expression(cfAttribute);
+
+    	  setCf(cfAttribute, 0);
+    	  setCfLoad(cfAttribute, 1);
+
+    	  if(symbol == SYM_RBRACKET)
+    		  getSymbol();
+    	  else
+    		  syntaxErrorSymbol(SYM_RBRACKET);
+
+    	  allocatedMemory = allocatedMemory + SIZEOFINT * getCfVal(cfAttribute);
+
+    	  if(symbol == SYM_SEMICOLON)
+    		  getSymbol();
+    	  else
+    		  syntaxErrorSymbol(SYM_SEMICOLON);
+
+    	  createSymbolTableEntry(GLOBAL_TABLE, variableOrProcedureName, lineNumber, ARRAY, type, 0, -allocatedMemory);
+    	  setSize(global_symbol_table, SIZEOFINT * getCfVal(cfAttribute));
+
+      } else {
           allocatedMemory = allocatedMemory + WORDSIZE;
 
           // type identifier ";" global variable declaration
@@ -4412,8 +4438,13 @@ void emitGlobalsStrings() {
       storeBinary(binaryLength, getValue(entry));
 
       binaryLength = binaryLength + WORDSIZE;
-    } else if (getClass(entry) == STRING)
+    } else if (getClass(entry) == STRING){
       binaryLength = copyStringToBinary(getString(entry), binaryLength);
+    } else if(getClass(entry) == ARRAY) {
+      storeBinary(binaryLength, getValue(entry));
+
+      binaryLength = binaryLength + getSize(entry);
+    }
 
     entry = getNextEntry(entry);
   }
@@ -7089,39 +7120,34 @@ int selfie(int argc, int* argv) {
   return 0;
 }
 
-void test();
+int globArray1[10];
+int globArray2[100];
 
 void test(){
-	  //int* array;
-	  int testArray[10];
-	  int testArray2[33];
-	  int x;
-	  //array = malloc(4 * 31);
 
-	  //*array = 10;
-	  //*(array + 1) = 20;
-	  testArray2[30] = 333;
-	  testArray2[32] = 444;
+	  int testArray[10];
+
+	  int x;
 
 	  testArray[0] = 10;
 	  testArray[1] = 23;
 
-	  x = testArray[0];
+	  globArray1[0] = 33;
+
+	  globArray2[99] = 999;
+
+
+	  x = globArray1[0];
 	  print(itoa(x, string_buffer, 10, 0, 0));
 	  println();
 
-	  x = testArray[1];
+	  x = globArray2[99];
 	  print(itoa(x, string_buffer, 10, 0, 0));
 	  println();
 
-	  x = testArray2[30];
-	  print(itoa(x, string_buffer, 10, 0, 0));
-	  println();
-
-	  x = testArray2[32];
-	  print(itoa(x, string_buffer, 10, 0, 0));
-	  println();
 }
+
+
 
 int main(int argc, int* argv) {
   initLibrary();
