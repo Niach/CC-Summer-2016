@@ -282,7 +282,7 @@ int SYM_RS           = 29; // >>
 int SYM_LBRACKET     = 30; // [
 int SYM_RBRACKET     = 31; // ]
 
-int* SYMBOLS; // array of strings representing symbols
+int SYMBOLS[32];
 
 int maxIdentifierLength = 64; // maximum number of characters in an identifier
 int maxIntegerLength    = 10; // maximum number of characters in an integer
@@ -312,44 +312,44 @@ int  sourceFD   = 0;        // file descriptor of open source file
 // ------------------------- INITIALIZATION ------------------------
 
 void initScanner () {
-  SYMBOLS = malloc(32 * SIZEOFINTSTAR);
 
-  *(SYMBOLS + SYM_IDENTIFIER)   = (int) "identifier";
-  *(SYMBOLS + SYM_INTEGER)      = (int) "integer";
-  *(SYMBOLS + SYM_VOID)         = (int) "void";
-  *(SYMBOLS + SYM_INT)          = (int) "int";
-  *(SYMBOLS + SYM_SEMICOLON)    = (int) ";";
-  *(SYMBOLS + SYM_IF)           = (int) "if";
-  *(SYMBOLS + SYM_ELSE)         = (int) "else";
-  *(SYMBOLS + SYM_PLUS)         = (int) "+";
-  *(SYMBOLS + SYM_MINUS)        = (int) "-";
-  *(SYMBOLS + SYM_ASTERISK)     = (int) "*";
-  *(SYMBOLS + SYM_DIV)          = (int) "/";
-  *(SYMBOLS + SYM_EQUALITY)     = (int) "==";
-  *(SYMBOLS + SYM_ASSIGN)       = (int) "=";
-  *(SYMBOLS + SYM_LPARENTHESIS) = (int) "(";
-  *(SYMBOLS + SYM_RPARENTHESIS) = (int) ")";
-  *(SYMBOLS + SYM_LBRACE)       = (int) "{";
-  *(SYMBOLS + SYM_RBRACE)       = (int) "}";
-  *(SYMBOLS + SYM_WHILE)        = (int) "while";
-  *(SYMBOLS + SYM_RETURN)       = (int) "return";
-  *(SYMBOLS + SYM_COMMA)        = (int) ",";
-  *(SYMBOLS + SYM_LT)           = (int) "<";
-  *(SYMBOLS + SYM_LEQ)          = (int) "<=";
-  *(SYMBOLS + SYM_GT)           = (int) ">";
-  *(SYMBOLS + SYM_GEQ)          = (int) ">=";
-  *(SYMBOLS + SYM_NOTEQ)        = (int) "!=";
-  *(SYMBOLS + SYM_MOD)          = (int) "%";
-  *(SYMBOLS + SYM_CHARACTER)    = (int) "character";
-  *(SYMBOLS + SYM_STRING)       = (int) "string";
-  *(SYMBOLS + SYM_LS)			= (int) "<<";
-  *(SYMBOLS + SYM_RS)           = (int) ">>";
-  *(SYMBOLS + SYM_LBRACKET)     = (int) "[";
-  *(SYMBOLS + SYM_RBRACKET)     = (int) "]";
+	SYMBOLS[SYM_IDENTIFIER]   = (int) "identifier";
+	SYMBOLS[SYM_INTEGER]      = (int) "integer";
+	SYMBOLS[SYM_VOID]         = (int) "void";
+	SYMBOLS[SYM_INT]          = (int) "int";
+	SYMBOLS[SYM_SEMICOLON]    = (int) ";";
+	SYMBOLS[SYM_IF]           = (int) "if";
+	SYMBOLS[SYM_ELSE]         = (int) "else";
+	SYMBOLS[SYM_PLUS]         = (int) "+";
+	SYMBOLS[SYM_MINUS]        = (int) "-";
+	SYMBOLS[SYM_ASTERISK]     = (int) "*";
+	SYMBOLS[SYM_DIV]          = (int) "/";
+	SYMBOLS[SYM_EQUALITY]     = (int) "==";
+	SYMBOLS[SYM_ASSIGN]       = (int) "=";
+	SYMBOLS[SYM_LPARENTHESIS] = (int) "(";
+	SYMBOLS[SYM_RPARENTHESIS] = (int) ")";
+	SYMBOLS[SYM_LBRACE]       = (int) "{";
+	SYMBOLS[SYM_RBRACE]       = (int) "}";
+	SYMBOLS[SYM_WHILE]        = (int) "while";
+	SYMBOLS[SYM_RETURN]       = (int) "return";
+	SYMBOLS[SYM_COMMA]        = (int) ",";
+	SYMBOLS[SYM_LT]           = (int) "<";
+	SYMBOLS[SYM_LEQ]          = (int) "<=";
+	SYMBOLS[SYM_GT]           = (int) ">";
+	SYMBOLS[SYM_GEQ]          = (int) ">=";
+	SYMBOLS[SYM_NOTEQ]        = (int) "!=";
+	SYMBOLS[SYM_MOD]          = (int) "%";
+	SYMBOLS[SYM_CHARACTER]    = (int) "character";
+	SYMBOLS[SYM_STRING]       = (int) "string";
+	SYMBOLS[SYM_LS]		      = (int) "<<";
+	SYMBOLS[SYM_RS]           = (int) ">>";
+	SYMBOLS[SYM_LBRACKET]     = (int) "[";
+	SYMBOLS[SYM_RBRACKET]     = (int) "]";
 
   character = CHAR_EOF;
   symbol  = SYM_EOF;
 }
+
 
 void resetScanner() {
   lineNumber = 1;
@@ -376,7 +376,7 @@ int reportUndefinedProcedures();
 // |  0 | next    | pointer to next entry
 // |  1 | string  | identifier string, string literal
 // |  2 | line#   | source line number
-// |  3 | class   | VARIABLE, PROCEDURE, STRING
+// |  3 | class   | VARIABLE, PROCEDURE, STRING, ARRAY
 // |  4 | type    | INT_T, INTSTAR_T, VOID_T
 // |  5 | value   | VARIABLE: initial value
 // |  6 | address | VARIABLE: offset, PROCEDURE: address, STRING: offset
@@ -1588,7 +1588,7 @@ void printSymbol(int symbol) {
   if (symbol == SYM_EOF)
     print((int*) "end of file");
   else
-    print((int*) *(SYMBOLS + symbol));
+    print((int*) SYMBOLS[symbol]);
 
   putCharacter(CHAR_DOUBLEQUOTE);
 }
@@ -1748,7 +1748,7 @@ int isNotDoubleQuoteOrEOF() {
 }
 
 int identifierStringMatch(int keyword) {
-  return stringCompare(identifier, (int*) *(SYMBOLS + keyword));
+  return stringCompare(identifier, (int*) SYMBOLS[keyword]);
 }
 
 int identifierOrKeyword() {
@@ -7121,7 +7121,9 @@ int selfie(int argc, int* argv) {
 }
 
 int globArray1[10];
-int globArray2[100];
+
+int TEST = 1;
+int TEST2 = 2;
 
 void test(){
 
@@ -7132,16 +7134,17 @@ void test(){
 	  testArray[0] = 10;
 	  testArray[1] = 23;
 
-	  globArray1[0] = 33;
+	  globArray1[TEST + TEST2] = 7373;
+	  globArray1[1] = 33;
 
-	  globArray2[99] = 999;
 
 
-	  x = globArray1[0];
+
+	  x = globArray1[TEST + TEST2];
 	  print(itoa(x, string_buffer, 10, 0, 0));
 	  println();
 
-	  x = globArray2[99];
+	  x = globArray1[1];
 	  print(itoa(x, string_buffer, 10, 0, 0));
 	  println();
 
