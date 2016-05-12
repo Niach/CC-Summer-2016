@@ -382,6 +382,7 @@ int reportUndefinedProcedures();
 // |  6 | address | VARIABLE: offset, PROCEDURE: address, STRING: offset
 // |  7 | scope   | REG_GP, REG_FP
 // |  8 | size    | Size in Byte
+// |  9 | size2d  | Size if array is 2d
 // +----+---------+
 
 int* getNextEntry(int* entry)  { return (int*) *entry; }
@@ -392,7 +393,8 @@ int  getType(int* entry)       { return        *(entry + 4); }
 int  getValue(int* entry)      { return        *(entry + 5); }
 int  getAddress(int* entry)    { return        *(entry + 6); }
 int  getScope(int* entry)      { return        *(entry + 7); }
-int  getSize(int * entry)      { return        *(entry + 8); }
+int  getSize(int* entry)       { return        *(entry + 8); }
+int  getSize2D(int* entry)     { return        *(entry + 9); }
 
 void setNextEntry(int* entry, int* next)    { *entry       = (int) next; }
 void setString(int* entry, int* identifier) { *(entry + 1) = (int) identifier; }
@@ -403,6 +405,7 @@ void setValue(int* entry, int value)        { *(entry + 5) = value; }
 void setAddress(int* entry, int address)    { *(entry + 6) = address; }
 void setScope(int* entry, int scope)        { *(entry + 7) = scope; }
 void setSize(int* entry, int size)          { *(entry + 8) = size; }
+void setSize2D(int* entry, int size)          { *(entry + 9) = size; }
 
 // ------------------------ GLOBAL CONSTANTS -----------------------
 
@@ -2026,7 +2029,7 @@ int getSymbol() {
 void createSymbolTableEntry(int whichTable, int* string, int line, int class, int type, int value, int address) {
   int* newEntry;
 
-  newEntry = malloc(2 * SIZEOFINTSTAR + 7 * SIZEOFINT);
+  newEntry = malloc(2 * SIZEOFINTSTAR + 8 * SIZEOFINT);
 
   setString(newEntry, string);
   setLineNumber(newEntry, line);
@@ -2735,12 +2738,9 @@ int gr_factor(int* cfAttribute) {
       entry = getVariable(variableOrProcedureName);
 
       type = gr_expression(cfAttribute);
-      emitLeftShiftBy(2);
 
       if(type != INT_T)
     	  typeWarning(INT_T, type);
-
-      //type = load_variable(variableOrProcedureName);
 
 
       if(symbol == SYM_RBRACKET)
@@ -2749,9 +2749,32 @@ int gr_factor(int* cfAttribute) {
     	 syntaxErrorSymbol(SYM_RBRACKET);
 
 
-      // add (index << 2) plus address of the element
-      emitRFormat(OP_SPECIAL, currentTemporary(), getScope(entry), currentTemporary(), FCT_ADDU);
+      //array 2D access? identifier "[" expression "]" "[" expression "]"
+      if(symbol == SYM_LBRACKET){
+    	  getSymbol();
 
+    	  load_integer(getSize2D(entry));
+    	  emitRFormat(OP_SPECIAL, currentTemporary(), previousTemporary(), currentTemporary(), FCT_MULTU);
+    	  emitRFormat(OP_SPECIAL, 0, 0, previousTemporary(), FCT_MFLO);
+    	  tfree(1);
+
+    	  type = gr_expression(cfAttribute);
+
+    	  if(symbol == SYM_RBRACKET)
+    		  getSymbol();
+    	  else
+    		  syntaxErrorSymbol(SYM_RBRACKET);
+
+    	  if(type != INT_T)
+    	       typeWarning(INT_T, type);
+
+    	  emitRFormat(OP_SPECIAL, currentTemporary(), previousTemporary(), currentTemporary(), FCT_ADDU);
+    	  tfree(1);
+
+      }
+      // add (index << 2) plus scope of the element
+      emitLeftShiftBy(2);
+      emitRFormat(OP_SPECIAL, currentTemporary(), getScope(entry), currentTemporary(), FCT_ADDU);
       emitIFormat(OP_LW, currentTemporary(), currentTemporary(), getAddress(entry));
 
       type = INT_T;
@@ -3521,7 +3544,7 @@ void gr_statement(int* cfAttribute) {
       else
         syntaxErrorSymbol(SYM_SEMICOLON);
 
-      // identifier [ "[" expression "]" ]
+      // identifier [ "[" expression "]" ] [ "[" expression "]" ]
     } else if (symbol == SYM_LBRACKET) {
     	getSymbol();
 
@@ -3538,6 +3561,31 @@ void gr_statement(int* cfAttribute) {
     		getSymbol();
     	else
     		syntaxErrorSymbol(SYM_RBRACKET);
+
+    	if(symbol == SYM_LBRACKET){
+    		getSymbol();
+
+    		load_integer(getSize2D(entry));
+    		emitRFormat(OP_SPECIAL, previousTemporary(), currentTemporary(), currentTemporary(), FCT_MULTU);
+    		emitRFormat(OP_SPECIAL, 0, 0, previousTemporary(), FCT_MFLO);
+    		tfree(1);
+
+    		rtype = gr_expression(cfAttribute);
+
+    		emitRFormat(OP_SPECIAL, previousTemporary(), currentTemporary(), currentTemporary(), FCT_ADDU);
+    		tfree(1);
+
+    		if(rtype != INT_T)
+    			typeWarning(INT_T, rtype);
+
+    		ltype = getType(entry);
+
+    		if(symbol == SYM_RBRACKET)
+    			getSymbol();
+    		else
+    			syntaxErrorSymbol(SYM_RBRACKET);
+    	}
+
 
     	// store in current temporary: scope address + (arrayIndex << 2)
     	emitLeftShiftBy(2);
@@ -3633,6 +3681,7 @@ int gr_variable(int offset, int* cfAttribute) {
   int indexType;
   int* variableOrProcedureName;
   int* entry;
+  int leftCfVal;
 
   type = gr_type();
 
@@ -3661,12 +3710,42 @@ int gr_variable(int offset, int* cfAttribute) {
       else
         syntaxErrorSymbol(SYM_RBRACKET);
 
-      offset = offset + WORDSIZE - getCfVal(cfAttribute) * SIZEOFINT;
-      createSymbolTableEntry(LOCAL_TABLE, variableOrProcedureName, lineNumber, ARRAY, type, 0, offset);
-      entry = getVariable(variableOrProcedureName);
-      //searchSymbolTable(local_symbol_table, variableOrProcedureName, ARRAY);
-      setSize(entry, SIZEOFINT * getCfVal(cfAttribute));
-      offset = getCfVal(cfAttribute);
+      if(symbol == SYM_LBRACKET){
+    	  getSymbol();
+
+    	  leftCfVal = getCfVal(cfAttribute);
+
+          setCf(cfAttribute, 0);
+          setCfLoad(cfAttribute, 0);
+
+          indexType = gr_expression(cfAttribute);
+          setCf(cfAttribute, 0);
+          setCfLoad(cfAttribute, 1);
+
+          if(indexType != INT_T)
+            typeWarning(INT_T, indexType);
+
+          if(symbol == SYM_RBRACKET)
+            getSymbol();
+          else
+            syntaxErrorSymbol(SYM_RBRACKET);
+
+    	  offset = offset + WORDSIZE - getCfVal(cfAttribute) * leftCfVal * SIZEOFINT;
+    	  createSymbolTableEntry(LOCAL_TABLE, variableOrProcedureName, lineNumber, ARRAY, type, 0, offset);
+    	  entry = getVariable(variableOrProcedureName);
+    	  setSize(entry, SIZEOFINT * getCfVal(cfAttribute) * leftCfVal);
+    	  setSize2D(entry, getCfVal(cfAttribute));
+    	  offset = getCfVal(cfAttribute) * leftCfVal;
+
+
+      } else {
+
+    	  offset = offset + WORDSIZE - getCfVal(cfAttribute) * SIZEOFINT;
+    	  createSymbolTableEntry(LOCAL_TABLE, variableOrProcedureName, lineNumber, ARRAY, type, 0, offset);
+    	  entry = getVariable(variableOrProcedureName);
+    	  setSize(entry, SIZEOFINT * getCfVal(cfAttribute));
+    	  offset = getCfVal(cfAttribute);
+      }
       return offset;
 
     } else
@@ -3895,12 +3974,18 @@ void gr_procedure(int* procedure, int returnType, int* cfAttribute) {
 void gr_cstar() {
   int type;
   int* variableOrProcedureName;
+  int cfLeftVal;
+  int is2D;
+  int* entry;
 
   int* cfAttribute;
   cfAttribute = createCfAttribute();
   setCf(cfAttribute, 0);
   setCfVal(cfAttribute, 0);
   setCfLoad(cfAttribute, 1);
+
+  is2D = 0;
+  cfLeftVal = 1;
 
   while (symbol != SYM_EOF) {
     while (lookForType()) {
@@ -3937,6 +4022,8 @@ void gr_cstar() {
         // type identifier "(" procedure declaration or definition
         if (symbol == SYM_LPARENTHESIS) {
           gr_procedure(variableOrProcedureName, type, cfAttribute);
+
+       // type identifier "[" expression "]"
       } else if(symbol == SYM_LBRACKET) {
     	  getSymbol();
 
@@ -3953,7 +4040,28 @@ void gr_cstar() {
     	  else
     		  syntaxErrorSymbol(SYM_RBRACKET);
 
-    	  allocatedMemory = allocatedMemory + SIZEOFINT * getCfVal(cfAttribute);
+    	  // type identifier "[" expression "]" "[" expression "]"
+    	  if(symbol == SYM_LBRACKET){
+    		  getSymbol();
+
+    	      cfLeftVal = getCfVal(cfAttribute);
+    	      setCf(cfAttribute, 0);
+    	      setCfLoad(cfAttribute, 0);
+
+    	      type = gr_expression(cfAttribute);
+
+    	      setCf(cfAttribute, 0);
+    	      setCfLoad(cfAttribute, 1);
+    	      is2D = 1;
+
+    	      if(symbol == SYM_RBRACKET)
+    	          getSymbol();
+    	      else
+    	    	  syntaxErrorSymbol(SYM_RBRACKET);
+
+    	  }
+    	  allocatedMemory = allocatedMemory + SIZEOFINT * cfLeftVal * getCfVal(cfAttribute);
+
 
     	  if(symbol == SYM_SEMICOLON)
     		  getSymbol();
@@ -3961,7 +4069,13 @@ void gr_cstar() {
     		  syntaxErrorSymbol(SYM_SEMICOLON);
 
     	  createSymbolTableEntry(GLOBAL_TABLE, variableOrProcedureName, lineNumber, ARRAY, type, 0, -allocatedMemory);
-    	  setSize(global_symbol_table, SIZEOFINT * getCfVal(cfAttribute));
+    	  setSize(global_symbol_table, SIZEOFINT * cfLeftVal * getCfVal(cfAttribute));
+
+    	  if(is2D){
+    		  entry = getVariable(variableOrProcedureName);
+    		  setSize2D(entry, getCfVal(cfAttribute));
+    		  is2D = 0;
+    	  }
 
       } else {
           allocatedMemory = allocatedMemory + WORDSIZE;
@@ -7120,31 +7234,66 @@ int selfie(int argc, int* argv) {
   return 0;
 }
 
-int globArray1[10];
 
-int TEST = 1;
-int TEST2 = 2;
+int global2D[10][20];
+
 
 void test(){
 
 	  int testArray[10];
+	  int test2DArray[10][20];
 
 	  int x;
+
+
+	  global2D[3][4] = 3434;
+
+	  global2D[9][5] = 2222;
+	  global2D[3][9] = 9999;
+
+
 
 	  testArray[0] = 10;
 	  testArray[1] = 23;
 
-	  globArray1[TEST + TEST2] = 7373;
-	  globArray1[1] = 33;
 
-
-
-
-	  x = globArray1[TEST + TEST2];
+	  x = global2D[3][0];
 	  print(itoa(x, string_buffer, 10, 0, 0));
 	  println();
 
-	  x = globArray1[1];
+	  x = global2D[3][1];
+	  print(itoa(x, string_buffer, 10, 0, 0));
+	  println();
+
+	  x = global2D[3][2];
+	  print(itoa(x, string_buffer, 10, 0, 0));
+	  println();
+
+	  x = global2D[3][3];
+	  print(itoa(x, string_buffer, 10, 0, 0));
+	  println();
+
+	  x = global2D[3][4];
+	  print(itoa(x, string_buffer, 10, 0, 0));
+	  println();
+
+	  x = global2D[3][5];
+	  print(itoa(x, string_buffer, 10, 0, 0));
+	  println();
+
+	  x = global2D[3][6];
+	  print(itoa(x, string_buffer, 10, 0, 0));
+	  println();
+
+	  x = global2D[3][7];
+	  print(itoa(x, string_buffer, 10, 0, 0));
+	  println();
+
+	  x = global2D[3][8];
+	  print(itoa(x, string_buffer, 10, 0, 0));
+	  println();
+
+	  x = global2D[3][9];
 	  print(itoa(x, string_buffer, 10, 0, 0));
 	  println();
 
