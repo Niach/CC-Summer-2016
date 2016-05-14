@@ -2754,7 +2754,7 @@ int gr_factor(int* cfAttribute) {
     	  getSymbol();
 
     	  load_integer(getSize2D(entry));
-    	  emitRFormat(OP_SPECIAL, currentTemporary(), previousTemporary(), currentTemporary(), FCT_MULTU);
+    	  emitRFormat(OP_SPECIAL, currentTemporary(), previousTemporary(), previousTemporary(), FCT_MULTU);
     	  emitRFormat(OP_SPECIAL, 0, 0, previousTemporary(), FCT_MFLO);
     	  tfree(1);
 
@@ -2768,7 +2768,7 @@ int gr_factor(int* cfAttribute) {
     	  if(type != INT_T)
     	       typeWarning(INT_T, type);
 
-    	  emitRFormat(OP_SPECIAL, currentTemporary(), previousTemporary(), currentTemporary(), FCT_ADDU);
+    	  emitRFormat(OP_SPECIAL, currentTemporary(), previousTemporary(), previousTemporary(), FCT_ADDU);
     	  tfree(1);
 
       }
@@ -3566,13 +3566,13 @@ void gr_statement(int* cfAttribute) {
     		getSymbol();
 
     		load_integer(getSize2D(entry));
-    		emitRFormat(OP_SPECIAL, previousTemporary(), currentTemporary(), currentTemporary(), FCT_MULTU);
+    		emitRFormat(OP_SPECIAL, currentTemporary(), previousTemporary(), previousTemporary(), FCT_MULTU);
     		emitRFormat(OP_SPECIAL, 0, 0, previousTemporary(), FCT_MFLO);
     		tfree(1);
 
     		rtype = gr_expression(cfAttribute);
 
-    		emitRFormat(OP_SPECIAL, previousTemporary(), currentTemporary(), currentTemporary(), FCT_ADDU);
+    		emitRFormat(OP_SPECIAL, currentTemporary(), previousTemporary(), previousTemporary(), FCT_ADDU);
     		tfree(1);
 
     		if(rtype != INT_T)
@@ -4060,7 +4060,7 @@ void gr_cstar() {
     	    	  syntaxErrorSymbol(SYM_RBRACKET);
 
     	  }
-    	  allocatedMemory = allocatedMemory + SIZEOFINT * cfLeftVal * getCfVal(cfAttribute);
+    	  allocatedMemory = allocatedMemory + WORDSIZE * cfLeftVal * getCfVal(cfAttribute);
 
 
     	  if(symbol == SYM_SEMICOLON)
@@ -4069,7 +4069,7 @@ void gr_cstar() {
     		  syntaxErrorSymbol(SYM_SEMICOLON);
 
     	  createSymbolTableEntry(GLOBAL_TABLE, variableOrProcedureName, lineNumber, ARRAY, type, 0, -allocatedMemory);
-    	  setSize(global_symbol_table, SIZEOFINT * cfLeftVal * getCfVal(cfAttribute));
+    	  setSize(global_symbol_table, WORDSIZE * cfLeftVal * getCfVal(cfAttribute));
 
     	  if(is2D){
     		  entry = getVariable(variableOrProcedureName);
@@ -7236,25 +7236,15 @@ int selfie(int argc, int* argv) {
 
 
 int global2D[10][20];
+int globalA[30];
 
 
 void test(){
-
-	  int testArray[10];
-	  int test2DArray[10][20];
-
 	  int x;
 
-
 	  global2D[3][4] = 3434;
-
 	  global2D[9][5] = 2222;
 	  global2D[3][9] = 9999;
-
-
-
-	  testArray[0] = 10;
-	  testArray[1] = 23;
 
 
 	  x = global2D[3][0];
@@ -7299,7 +7289,28 @@ void test(){
 
 }
 
+void test2(){
+	int x;
+	int localA[30];
 
+	localA[0] = 911;
+	globalA[0] = 33;
+	globalA[1] = 44;
+	globalA[2] = localA[0];
+
+
+	x = globalA[0];
+	print(itoa(x, string_buffer, 10, 0, 0));
+	println();
+
+	x = globalA[1];
+	print(itoa(x, string_buffer, 10, 0, 0));
+	println();
+
+	x = globalA[2];
+	print(itoa(x, string_buffer, 10, 0, 0));
+	println();
+}
 
 int main(int argc, int* argv) {
   initLibrary();
