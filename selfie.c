@@ -2779,7 +2779,6 @@ int gr_factor(int* cfAttribute) {
       emitRFormat(OP_SPECIAL, currentTemporary(), getScope(entry), currentTemporary(), FCT_ADDU);
       emitIFormat(OP_LW, currentTemporary(), currentTemporary(), getAddress(entry));
 
-      type = INT_T;
     } else
       // variable access: identifier
       type = load_variable(variableOrProcedureName);
@@ -7236,77 +7235,18 @@ int selfie(int argc, int* argv) {
   return 0;
 }
 
-
-
-
-void test(){
-
-	  int x;
-	  int i;
-	  int j;
-	  int global2D[10][2];
-
-	  j = 0;
-	  i = 0;
-
-	  while(i < 10){
-		  while(j < 2){
-			  global2D[i][j] = global2D[i][j] + 300;
-			  j = j + 1;
-		  }
-		  i = i + 1;
-		  j = 0;
-	  }
-	  i = 0;
-	  j = 0;
-
-	  while(i < 10){
-		  while(j < 2){
-			  x = global2D[i][j];
-			  print(itoa(x, string_buffer, 10, 0, 0));
-			  println();
-			  j = j + 1;
-		  }
-		  i = i + 1;
-		  j = 0;
-	  }
-
-}
-
-
-void test2(){
-	int x;
-	int i;
-	int globalA[30];
-
-
-	i = 0;
-
-	while(i < 12){
-		globalA[i] = i + 300 + i + 300 + i;
-		i = i + 1;
-	}
-	i = 0;
-
-	while(i < 12){
-		x = globalA[i];
-		print(itoa(x, string_buffer, 10, 0, 0));
-		println();
-		i = i + 1;
-	}
-
-
-}
-
 void printSymbolTable(){
 	int i;
+	int x;
 
 	i = 0;
 	while(i < 32){
 		print((int*) "Count of ");
-		print((int*) SYMBOLS[i][0]);
+		x = SYMBOLS[i][0];
+		print((int*) x);
 		print((int*) " is ");
-		print(itoa(SYMBOLS[i][1], string_buffer, 10, 0, 0));
+		x = SYMBOLS[i][1];
+		print(itoa(x, string_buffer, 10, 0, 0));
 		println();
 		i = i + 1;
 	}
@@ -7329,13 +7269,18 @@ int main(int argc, int* argv) {
 
   print((int*) "This is BeTheCompiler Selfie");
   println();
-  test();
+
+
 
   if (selfie(argc, (int*) argv) != 0) {
     print(selfieName);
     print((int*) ": usage: selfie { -c source | -o binary | -s assembly | -l binary } [ -m size ... | -d size ... | -y size ... ] ");
     println();
   }
+
+
+ // print symbols and the count of them
+  printSymbolTable();
 
   return 0;
 }
