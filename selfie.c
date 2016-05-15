@@ -282,7 +282,7 @@ int SYM_RS           = 29; // >>
 int SYM_LBRACKET     = 30; // [
 int SYM_RBRACKET     = 31; // ]
 
-int SYMBOLS[32];
+int SYMBOLS[32][2];
 
 int maxIdentifierLength = 64; // maximum number of characters in an identifier
 int maxIntegerLength    = 10; // maximum number of characters in an integer
@@ -313,38 +313,38 @@ int  sourceFD   = 0;        // file descriptor of open source file
 
 void initScanner () {
 
-	SYMBOLS[SYM_IDENTIFIER]   = (int) "identifier";
-	SYMBOLS[SYM_INTEGER]      = (int) "integer";
-	SYMBOLS[SYM_VOID]         = (int) "void";
-	SYMBOLS[SYM_INT]          = (int) "int";
-	SYMBOLS[SYM_SEMICOLON]    = (int) ";";
-	SYMBOLS[SYM_IF]           = (int) "if";
-	SYMBOLS[SYM_ELSE]         = (int) "else";
-	SYMBOLS[SYM_PLUS]         = (int) "+";
-	SYMBOLS[SYM_MINUS]        = (int) "-";
-	SYMBOLS[SYM_ASTERISK]     = (int) "*";
-	SYMBOLS[SYM_DIV]          = (int) "/";
-	SYMBOLS[SYM_EQUALITY]     = (int) "==";
-	SYMBOLS[SYM_ASSIGN]       = (int) "=";
-	SYMBOLS[SYM_LPARENTHESIS] = (int) "(";
-	SYMBOLS[SYM_RPARENTHESIS] = (int) ")";
-	SYMBOLS[SYM_LBRACE]       = (int) "{";
-	SYMBOLS[SYM_RBRACE]       = (int) "}";
-	SYMBOLS[SYM_WHILE]        = (int) "while";
-	SYMBOLS[SYM_RETURN]       = (int) "return";
-	SYMBOLS[SYM_COMMA]        = (int) ",";
-	SYMBOLS[SYM_LT]           = (int) "<";
-	SYMBOLS[SYM_LEQ]          = (int) "<=";
-	SYMBOLS[SYM_GT]           = (int) ">";
-	SYMBOLS[SYM_GEQ]          = (int) ">=";
-	SYMBOLS[SYM_NOTEQ]        = (int) "!=";
-	SYMBOLS[SYM_MOD]          = (int) "%";
-	SYMBOLS[SYM_CHARACTER]    = (int) "character";
-	SYMBOLS[SYM_STRING]       = (int) "string";
-	SYMBOLS[SYM_LS]		      = (int) "<<";
-	SYMBOLS[SYM_RS]           = (int) ">>";
-	SYMBOLS[SYM_LBRACKET]     = (int) "[";
-	SYMBOLS[SYM_RBRACKET]     = (int) "]";
+	SYMBOLS[SYM_IDENTIFIER][0]   = (int) "identifier";
+	SYMBOLS[SYM_INTEGER][0]      = (int) "integer";
+	SYMBOLS[SYM_VOID][0]         = (int) "void";
+	SYMBOLS[SYM_INT][0]          = (int) "int";
+	SYMBOLS[SYM_SEMICOLON][0]    = (int) ";";
+	SYMBOLS[SYM_IF][0]           = (int) "if";
+	SYMBOLS[SYM_ELSE][0]         = (int) "else";
+	SYMBOLS[SYM_PLUS][0]         = (int) "+";
+	SYMBOLS[SYM_MINUS][0]        = (int) "-";
+	SYMBOLS[SYM_ASTERISK][0]     = (int) "*";
+	SYMBOLS[SYM_DIV][0]          = (int) "/";
+	SYMBOLS[SYM_EQUALITY][0]     = (int) "==";
+	SYMBOLS[SYM_ASSIGN][0]       = (int) "=";
+	SYMBOLS[SYM_LPARENTHESIS][0] = (int) "(";
+	SYMBOLS[SYM_RPARENTHESIS][0] = (int) ")";
+	SYMBOLS[SYM_LBRACE][0]       = (int) "{";
+	SYMBOLS[SYM_RBRACE][0]       = (int) "}";
+	SYMBOLS[SYM_WHILE][0]        = (int) "while";
+	SYMBOLS[SYM_RETURN][0]       = (int) "return";
+	SYMBOLS[SYM_COMMA][0]        = (int) ",";
+	SYMBOLS[SYM_LT][0]           = (int) "<";
+	SYMBOLS[SYM_LEQ][0]          = (int) "<=";
+	SYMBOLS[SYM_GT][0]           = (int) ">";
+	SYMBOLS[SYM_GEQ][0]          = (int) ">=";
+	SYMBOLS[SYM_NOTEQ][0]        = (int) "!=";
+	SYMBOLS[SYM_MOD][0]          = (int) "%";
+	SYMBOLS[SYM_CHARACTER][0]    = (int) "character";
+	SYMBOLS[SYM_STRING][0]       = (int) "string";
+	SYMBOLS[SYM_LS][0]		     = (int) "<<";
+	SYMBOLS[SYM_RS][0]           = (int) ">>";
+	SYMBOLS[SYM_LBRACKET][0]     = (int) "[";
+	SYMBOLS[SYM_RBRACKET][0]     = (int) "]";
 
   character = CHAR_EOF;
   symbol  = SYM_EOF;
@@ -1591,7 +1591,7 @@ void printSymbol(int symbol) {
   if (symbol == SYM_EOF)
     print((int*) "end of file");
   else
-    print((int*) SYMBOLS[symbol]);
+    print((int*) SYMBOLS[symbol][0]);
 
   putCharacter(CHAR_DOUBLEQUOTE);
 }
@@ -1751,7 +1751,7 @@ int isNotDoubleQuoteOrEOF() {
 }
 
 int identifierStringMatch(int keyword) {
-  return stringCompare(identifier, (int*) SYMBOLS[keyword]);
+  return stringCompare(identifier, (int*) SYMBOLS[keyword][0]);
 }
 
 int identifierOrKeyword() {
@@ -1778,9 +1778,11 @@ int getSymbol() {
 
   if (findNextCharacter() == CHAR_EOF)
     return SYM_EOF;
-  else if (symbol == SYM_DIV)
+  else if (symbol == SYM_DIV){
     // check here because / was recognized instead of //
+	  SYMBOLS[symbol][1] = SYMBOLS[symbol][1] + 1;
     return SYM_DIV;
+  }
 
   if (isCharacterLetter()) {
     identifier = malloc(maxIdentifierLength + 1);
@@ -2018,7 +2020,7 @@ int getSymbol() {
 
     exit(-1);
   }
-
+  SYMBOLS[symbol][1] = SYMBOLS[symbol][1] + 1;
   return symbol;
 }
 
@@ -2754,7 +2756,7 @@ int gr_factor(int* cfAttribute) {
     	  getSymbol();
 
     	  load_integer(getSize2D(entry));
-    	  emitRFormat(OP_SPECIAL, currentTemporary(), previousTemporary(), previousTemporary(), FCT_MULTU);
+    	  emitRFormat(OP_SPECIAL, currentTemporary(), previousTemporary(), 0, FCT_MULTU);
     	  emitRFormat(OP_SPECIAL, 0, 0, previousTemporary(), FCT_MFLO);
     	  tfree(1);
 
@@ -3027,9 +3029,9 @@ int gr_simpleExpression(int* cfAttribute) {
 
     		if(operatorSymbol == SYM_PLUS){
 
-    			emitRFormat(OP_SPECIAL, currentTemporary(), previousTemporary(), currentTemporary(), FCT_ADDU);
+    			emitRFormat(OP_SPECIAL, currentTemporary(), previousTemporary(), previousTemporary(), FCT_ADDU);
     		}else if(operatorSymbol == SYM_MINUS){
-    			emitRFormat(OP_SPECIAL, currentTemporary(), previousTemporary(), currentTemporary(), FCT_SUBU);
+    			emitRFormat(OP_SPECIAL, currentTemporary(), previousTemporary(), previousTemporary(), FCT_SUBU);
     		}
 
     	} else if(isCfSet(cfAttribute)){
@@ -3118,9 +3120,9 @@ int gr_shiftExpression(int* cfAttribute){
 	        		load_cf_val(leftCfVal);
 
 	        		if (operatorSymbol == SYM_LS)
-	        			emitRFormat(OP_SPECIAL, currentTemporary(), previousTemporary(), currentTemporary(), FCT_SLLV);
+	        			emitRFormat(OP_SPECIAL, currentTemporary(), previousTemporary(), previousTemporary(), FCT_SLLV);
 	        		else if (operatorSymbol == SYM_RS)
-	        			emitRFormat(OP_SPECIAL, currentTemporary(), previousTemporary(), currentTemporary(), FCT_SRLV);
+	        			emitRFormat(OP_SPECIAL, currentTemporary(), previousTemporary(), previousTemporary(), FCT_SRLV);
 
 	        		setCf(cfAttribute, 0);
 	        	}else if(isCfSet(cfAttribute)){
@@ -3857,7 +3859,7 @@ void gr_procedure(int* procedure, int returnType, int* cfAttribute) {
     if (symbol != SYM_RPARENTHESIS) {
       offset = gr_variable(0, cfAttribute);
 
-      numberOfParameters = 1;
+      numberOfParameters = offset;
 
       while (symbol == SYM_COMMA) {
         getSymbol();
@@ -7235,81 +7237,79 @@ int selfie(int argc, int* argv) {
 }
 
 
-int global2D[10][20];
-int globalA[30];
 
 
 void test(){
+
 	  int x;
+	  int i;
+	  int j;
+	  int global2D[10][2];
 
-	  global2D[3][4] = 3434;
-	  global2D[9][5] = 2222;
-	  global2D[3][9] = 9999;
+	  j = 0;
+	  i = 0;
 
+	  while(i < 10){
+		  while(j < 2){
+			  global2D[i][j] = global2D[i][j] + 300;
+			  j = j + 1;
+		  }
+		  i = i + 1;
+		  j = 0;
+	  }
+	  i = 0;
+	  j = 0;
 
-	  x = global2D[3][0];
-	  print(itoa(x, string_buffer, 10, 0, 0));
-	  println();
-
-	  x = global2D[3][1];
-	  print(itoa(x, string_buffer, 10, 0, 0));
-	  println();
-
-	  x = global2D[3][2];
-	  print(itoa(x, string_buffer, 10, 0, 0));
-	  println();
-
-	  x = global2D[3][3];
-	  print(itoa(x, string_buffer, 10, 0, 0));
-	  println();
-
-	  x = global2D[3][4];
-	  print(itoa(x, string_buffer, 10, 0, 0));
-	  println();
-
-	  x = global2D[3][5];
-	  print(itoa(x, string_buffer, 10, 0, 0));
-	  println();
-
-	  x = global2D[3][6];
-	  print(itoa(x, string_buffer, 10, 0, 0));
-	  println();
-
-	  x = global2D[3][7];
-	  print(itoa(x, string_buffer, 10, 0, 0));
-	  println();
-
-	  x = global2D[3][8];
-	  print(itoa(x, string_buffer, 10, 0, 0));
-	  println();
-
-	  x = global2D[3][9];
-	  print(itoa(x, string_buffer, 10, 0, 0));
-	  println();
+	  while(i < 10){
+		  while(j < 2){
+			  x = global2D[i][j];
+			  print(itoa(x, string_buffer, 10, 0, 0));
+			  println();
+			  j = j + 1;
+		  }
+		  i = i + 1;
+		  j = 0;
+	  }
 
 }
 
+
 void test2(){
 	int x;
-	int localA[30];
-
-	localA[0] = 911;
-	globalA[0] = 33;
-	globalA[1] = 44;
-	globalA[2] = localA[0];
+	int i;
+	int globalA[30];
 
 
-	x = globalA[0];
-	print(itoa(x, string_buffer, 10, 0, 0));
-	println();
+	i = 0;
 
-	x = globalA[1];
-	print(itoa(x, string_buffer, 10, 0, 0));
-	println();
+	while(i < 12){
+		globalA[i] = i + 300 + i + 300 + i;
+		i = i + 1;
+	}
+	i = 0;
 
-	x = globalA[2];
-	print(itoa(x, string_buffer, 10, 0, 0));
-	println();
+	while(i < 12){
+		x = globalA[i];
+		print(itoa(x, string_buffer, 10, 0, 0));
+		println();
+		i = i + 1;
+	}
+
+
+}
+
+void printSymbolTable(){
+	int i;
+
+	i = 0;
+	while(i < 32){
+		print((int*) "Count of ");
+		print((int*) SYMBOLS[i][0]);
+		print((int*) " is ");
+		print(itoa(SYMBOLS[i][1], string_buffer, 10, 0, 0));
+		println();
+		i = i + 1;
+	}
 }
 
 int main(int argc, int* argv) {
