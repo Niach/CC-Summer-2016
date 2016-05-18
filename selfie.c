@@ -281,8 +281,9 @@ int SYM_LS			     = 28; // <<
 int SYM_RS           = 29; // >>
 int SYM_LBRACKET     = 30; // [
 int SYM_RBRACKET     = 31; // ]
+int SYM_STRUCT       = 32; // struct
 
-int SYMBOLS[32][2];
+int SYMBOLS[33][2];
 
 int maxIdentifierLength = 64; // maximum number of characters in an identifier
 int maxIntegerLength    = 10; // maximum number of characters in an integer
@@ -345,6 +346,7 @@ void initScanner () {
 	SYMBOLS[SYM_RS][0]           = (int) ">>";
 	SYMBOLS[SYM_LBRACKET][0]     = (int) "[";
 	SYMBOLS[SYM_RBRACKET][0]     = (int) "]";
+	SYMBOLS[SYM_STRUCT][0]       = (int) "struct";
 
   character = CHAR_EOF;
   symbol  = SYM_EOF;
@@ -419,6 +421,7 @@ int ARRAY     = 4;
 int INT_T     = 1;
 int INTSTAR_T = 2;
 int VOID_T    = 3;
+int STRUCT_T  = 4;
 
 // symbol tables
 int GLOBAL_TABLE  = 1;
@@ -431,6 +434,8 @@ int LIBRARY_TABLE = 3;
 int* global_symbol_table  = (int*) 0;
 int* local_symbol_table   = (int*) 0;
 int* library_symbol_table = (int*) 0;
+int* global_struct_symbol_table = (int*) 0;
+int* local_struct_symbol_table = (int*) 0;
 
 // ------------------------- INITIALIZATION ------------------------
 
@@ -438,6 +443,8 @@ void resetSymbolTables() {
   global_symbol_table  = (int*) 0;
   local_symbol_table   = (int*) 0;
   library_symbol_table = (int*) 0;
+  global_struct_symbol_table = (int*) 0;
+  local_struct_symbol_table = (int*) 0;
 }
 
 
@@ -536,6 +543,7 @@ void gr_return(int returnType, int* cfAttribute);
 void gr_statement(int* cfAttribute);
 int  gr_type();
 int gr_variable(int offset, int* cfAttribute);
+void gr_struct(int whichTable, int* cfAttribute);
 void gr_initialization(int* name, int offset, int type);
 void gr_procedure(int* procedure, int returnType, int* cfAttribute);
 void gr_cstar();
@@ -1767,6 +1775,8 @@ int identifierOrKeyword() {
     return SYM_RETURN;
   if (identifierStringMatch(SYM_VOID))
     return SYM_VOID;
+  if (identifierStringMatch(SYM_STRUCT))
+	  return SYM_STRUCT;
   else
     return SYM_IDENTIFIER;
 }
@@ -3671,8 +3681,22 @@ int gr_type() {
 
       getSymbol();
     }
+  } else if(symbol == SYM_STRUCT){
+	  type = STRUCT_T;
+	  getSymbol();
+
+	  if(symbol == SYM_IDENTIFIER)
+		  getSymbol();
+	  else
+		  syntaxErrorSymbol(SYM_IDENTIFIER);
+
+	  if(symbol == SYM_ASTERISK)
+		  getSymbol();
+	  else
+		  syntaxErrorSymbol(SYM_ASTERISK);
+
   } else
-    syntaxErrorSymbol(SYM_INT);
+    syntaxErrorUnexpected();
 
   return type;
 }
@@ -3731,7 +3755,8 @@ int gr_variable(int offset, int* cfAttribute) {
           else
             syntaxErrorSymbol(SYM_RBRACKET);
 
-    	  offset = offset + WORDSIZE - getCfVal(cfAttribute) * leftCfVal * SIZEOFINT;
+          if(offset < 0)
+        	  offset = offset + WORDSIZE - getCfVal(cfAttribute) * leftCfVal * SIZEOFINT;
     	  createSymbolTableEntry(LOCAL_TABLE, variableOrProcedureName, lineNumber, ARRAY, type, 0, offset);
     	  entry = getVariable(variableOrProcedureName);
     	  setSize(entry, SIZEOFINT * getCfVal(cfAttribute) * leftCfVal);
@@ -3740,8 +3765,8 @@ int gr_variable(int offset, int* cfAttribute) {
 
 
       } else {
-
-    	  offset = offset + WORDSIZE - getCfVal(cfAttribute) * SIZEOFINT;
+    	  if(offset < 0)
+    		  offset = offset + WORDSIZE - getCfVal(cfAttribute) * SIZEOFINT;
     	  createSymbolTableEntry(LOCAL_TABLE, variableOrProcedureName, lineNumber, ARRAY, type, 0, offset);
     	  entry = getVariable(variableOrProcedureName);
     	  setSize(entry, SIZEOFINT * getCfVal(cfAttribute));
@@ -3761,6 +3786,38 @@ int gr_variable(int offset, int* cfAttribute) {
     return 1;
   }
   return 1;
+}
+
+void gr_struct(int whichTable, int* cfAttribute) {
+	int size;
+	int type;
+	int* variableOrProcedureName;
+	int* entry;
+
+	type = INTSTAR_T;
+
+	if(symbol == SYM_IDENTIFIER){
+		getSymbol();
+		variableOrProcedureName = identifier;
+
+		if(symbol == SYM_ASTERISK){
+			getSymbol();
+
+			if(symbol == SYM_IDENTIFIER)
+				getSymbol();
+			else
+				syntaxErrorSymbol(SYM_IDENTIFIER);
+
+			type = STRUCT_T;
+			createSymbolTableEntry(whichTable, variableOrProcedureName, lineNumber, VARIABLE, type, 0, 0);
+		} else if(symbol == SYM_LBRACE) {
+			getSymbol();
+
+
+		}
+
+	}
+
 }
 
 void gr_initialization(int* name, int offset, int type) {
@@ -4012,6 +4069,12 @@ void gr_cstar() {
         gr_procedure(variableOrProcedureName, type, cfAttribute);
       } else
         syntaxErrorSymbol(SYM_IDENTIFIER);
+
+    } else if(symbol == SYM_STRUCT){
+    	getSymbol();
+
+    	//gr_struct(cfAttribute);
+
     } else {
       type = gr_type();
 
@@ -4062,7 +4125,6 @@ void gr_cstar() {
 
     	  }
     	  allocatedMemory = allocatedMemory + WORDSIZE * cfLeftVal * getCfVal(cfAttribute);
-
 
     	  if(symbol == SYM_SEMICOLON)
     		  getSymbol();
@@ -7263,9 +7325,6 @@ void test(){
 		println();
 		i = i + 1;
 	}
-
-
-
 }
 
 void printSymbolTable(){
