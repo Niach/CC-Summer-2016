@@ -7234,6 +7234,39 @@ int selfie(int argc, int* argv) {
 
   return 0;
 }
+int globalA[10][2];
+
+void test(){
+	int x;
+	int i;
+	globalA[0][0] = 0;
+	globalA[0][1] = 0;
+
+	i = 1;
+	while(i < 10){
+		globalA[i][0] = globalA[i - 1][0] + 1;
+		i = i + 1;
+	}
+
+	i = 1;
+	while(i < 10){
+		globalA[i][1] = globalA[i - 1][1] - 1;
+		i = i + 1;
+	}
+
+	i = 0;
+	while(i < 10){
+		x = globalA[i][0];
+		print(itoa(x, string_buffer, 10, 0, 0));
+		x = globalA[i][1];
+		print(itoa(x, string_buffer, 10, 0, 0));
+		println();
+		i = i + 1;
+	}
+
+
+
+}
 
 void printSymbolTable(){
 	int i;
@@ -7269,6 +7302,7 @@ int main(int argc, int* argv) {
 
   print((int*) "This is BeTheCompiler Selfie");
   println();
+  //test();
 
 
 
@@ -7280,7 +7314,7 @@ int main(int argc, int* argv) {
 
 
  // print symbols and the count of them
-  printSymbolTable();
+  //printSymbolTable();
 
   return 0;
 }
