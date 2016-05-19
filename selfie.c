@@ -1686,12 +1686,16 @@ int findNextCharacter() {
         return character;
 
     } else if (isCharacterWhitespace()) {
-      if (character == CHAR_LF)
+      if (character == CHAR_LF){
         lineNumber = lineNumber + 1;
-      else if (character == CHAR_CR)
+        getCharacter();
+      }else if (character == CHAR_CR){
         lineNumber = lineNumber + 1;
-
-      getCharacter();
+        getCharacter();
+        if(character == CHAR_LF)
+            getCharacter();
+      } else
+        getCharacter();
 
     } else if (character == CHAR_HASH) {
       getCharacter();
