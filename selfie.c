@@ -142,6 +142,8 @@ int CHAR_SINGLEQUOTE  = 39; // ASCII code 39 = '
 int CHAR_DOUBLEQUOTE  = '"';
 int CHAR_LBRACKET     = '[';
 int CHAR_RBRACKET     = ']';
+int CHAR_AMPERSAND    = '&';
+int CHAR_PIPE         = '|';
 
 int SIZEOFINT     = 4; // must be the same as WORDSIZE
 int SIZEOFINTSTAR = 4; // must be the same as WORDSIZE
@@ -277,13 +279,18 @@ int SYM_NOTEQ        = 24; // !=
 int SYM_MOD          = 25; // %
 int SYM_CHARACTER    = 26; // character
 int SYM_STRING       = 27; // string
-int SYM_LS			     = 28; // <<
+int SYM_LS			 = 28; // <<
 int SYM_RS           = 29; // >>
 int SYM_LBRACKET     = 30; // [
 int SYM_RBRACKET     = 31; // ]
 int SYM_STRUCT       = 32; // struct
+int SYM_AMPERSAND    = 33; // &
+int SYM_PIPE         = 34; // |
+int SYM_LAND         = 35; // &&
+int SYM_LOR          = 36; // ||
+int SYM_LNOT         = 37; // !
 
-int SYMBOLS[33][2];
+int SYMBOLS[38][2];
 
 int maxIdentifierLength = 64; // maximum number of characters in an identifier
 int maxIntegerLength    = 10; // maximum number of characters in an integer
@@ -347,6 +354,11 @@ void initScanner () {
 	SYMBOLS[SYM_LBRACKET][0]     = (int) "[";
 	SYMBOLS[SYM_RBRACKET][0]     = (int) "]";
 	SYMBOLS[SYM_STRUCT][0]       = (int) "struct";
+	SYMBOLS[SYM_AMPERSAND][0]    = (int) "&";
+	SYMBOLS[SYM_PIPE][0]         = (int) "|";
+	SYMBOLS[SYM_LAND][0]         = (int) "&&";
+	SYMBOLS[SYM_LOR][0]          = (int) "||";
+	SYMBOLS[SYM_LNOT][0]         = (int) "!";
 
   character = CHAR_EOF;
   symbol  = SYM_EOF;
@@ -2053,29 +2065,49 @@ int getSymbol() {
             symbol = SYM_GT;
 
     } else if (character == CHAR_EXCLAMATION) {
-    getCharacter();
-
-    if (character == CHAR_EQUAL)
       getCharacter();
-    else
-      syntaxErrorCharacter(CHAR_EQUAL);
 
-    symbol = SYM_NOTEQ;
+      if (character == CHAR_EQUAL){
+        getCharacter();
+        symbol = SYM_NOTEQ;
+      } else {
+        symbol = SYM_LNOT;
+      }
 
   } else if (character == CHAR_PERCENTAGE) {
     getCharacter();
 
     symbol = SYM_MOD;
 
-  } else if(character == CHAR_LBRACKET){
+  } else if (character == CHAR_LBRACKET) {
     getCharacter();
 
     symbol = SYM_LBRACKET;
 
-  } else if(character == CHAR_RBRACKET){
+  } else if (character == CHAR_RBRACKET) {
     getCharacter();
 
     symbol = SYM_RBRACKET;
+
+  } else if (character == CHAR_AMPERSAND) {
+	  getCharacter();
+
+	  if(character == CHAR_AMPERSAND) {
+		getCharacter();
+		symbol = SYM_LAND;
+	  } else {
+		symbol = SYM_AMPERSAND;
+	  }
+
+  } else if (character == CHAR_PIPE) {
+	  getCharacter();
+
+	  if(character == CHAR_PIPE) {
+		getCharacter();
+		symbol = SYM_LOR;
+	  } else {
+		symbol = SYM_PIPE;
+	  }
 
   } else {
     printLineNumber((int*) "error", lineNumber);
@@ -4595,7 +4627,7 @@ int getRD(int instruction) {
 }
 
 int getShamt(int instruction) {
-	return rightShift(leftShift(instruction, 21), 27);
+  return rightShift(leftShift(instruction, 21), 27);
 }
 
 int getFunction(int instruction) {
