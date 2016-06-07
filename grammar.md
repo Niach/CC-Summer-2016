@@ -11,65 +11,67 @@ C* is a small Turing-complete subset of C that includes dereferencing (the * ope
 Keywords: int, while, if, else, return, void
 
 ```
-digit            = "0" | ... | "9" .
+digit             = "0" | ... | "9" .
 
-integer          = digit { digit } .
+integer           = digit { digit } .
 
-letter           = "a" | ... | "z" | "A" | ... | "Z" .
+letter            = "a" | ... | "z" | "A" | ... | "Z" .
 
-identifier       = letter { letter | digit | "_" } .
+identifier        = letter { letter | digit | "_" } .
 
-type             = "int" [ "*" ] | "struct" identifier "*".
+type              = "int" [ "*" ] | "struct" identifier "*".
 
-cast             = "(" type ")" .
+cast              = "(" type ")" .
 
-call             = identifier "(" [ expression { "," expression } ] ")" .
+call              = identifier "(" [ expression { "," expression } ] ")" .
 
-literal          = integer | "'" ascii_character "'" .
+literal           = integer | "'" ascii_character "'" .
 
-factor           = [ cast ]
-                    ( [ "*" ] ( identifier [ "[" expression "]" ] [ "[" expression "]" ] | "(" expression ")" ) |
-                      call |
-                      literal |
-                      """ { ascii_character } """ ) .
+factor            = [ ! ] [ cast ]
+                     ( [ "*" ] ( identifier [ "[" expression "]" ] [ "[" expression "]" ] | "(" expression ")" ) |
+                       call |
+                       literal |
+                       """ { ascii_character } """ ) .
 
-term             = factor { ( "*" | "/" | "%" ) factor } .
+term              = factor { ( "*" | "/" | "%" ) factor } .
 
-simpleExpression = [ "-" ] term { ( "+" | "-" ) term } .
+simpleExpression  = [ "-" ] term { ( "+" | "-" ) term } .
 
-shiftExpression  = simpleExpression [ ( "<<" | ">>" ) simpleExpression ] .
+shiftExpression   = simpleExpression [ ( "<<" | ">>" ) simpleExpression ] .
 
-expression       = shiftExpression [ ( "==" | "!=" | "<" | ">" | "<=" | ">=" ) shiftExpression ] .
+compareExpression = shiftExpression [ ( "==" | "!=" | "<" | ">" | "<=" | ">=" ) shiftExpression ] .
 
-while            = "while" "(" expression ")"
-                             ( statement |
-                               "{" { statement } "}" ) .
+expression        = compareExpression ( { "&&" compareExpression } | { "||"  compareExpression } ) .
 
-if               = "if" "(" expression ")"
-                             ( statement |
-                               "{" { statement } "}" )
-                         [ "else"
-                             ( statement |
-                               "{" { statement } "}" ) ] .
+while             = "while" "(" expression ")"
+                              ( statement |
+                                "{" { statement } "}" ) .
 
-return           = "return" [ expression ] .
+if                = "if" "(" expression ")"
+                              ( statement |
+                                "{" { statement } "}" )
+                          [ "else"
+                              ( statement |
+                                "{" { statement } "}" ) ] .
 
-statement        = ( [ "*" ] identifier [ "[" expression "]" ] [ "[" expression "]" ] | "*" "(" expression ")" ) "="
-                      expression ";" |
-                    call ";" |
-                    while |
-                    if |
-                    return ";" .
+return            = "return" [ expression ] .
 
-variable         = type identifier [ "[" expression "]" ] [ "[" expression "]" ] | "struct" identifier "*" identifier .
+statement         = ( [ "*" ] identifier [ "[" expression "]" ] [ "[" expression "]" ] | "*" "(" expression ")" ) "="
+                       expression ";" |
+                     call ";" |
+                     while |
+                     if |
+                     return ";" .
 
-struct           = "struct" identifier "{" { variable ";" } "}" ";" .
+variable          = type identifier [ "[" expression "]" ] [ "[" expression "]" ] | "struct" identifier "*" identifier .
 
-procedure        = "(" [ variable { "," variable } ] ")"
-                    ( ";" | "{" { variable ";" | struct } { statement } "}" ) .
+struct            = "struct" identifier "{" { variable ";" } "}" ";" .
 
-cstar            = { type identifier [ "[" expression "]" ] [ "[" expression "]" ] [ "=" [ cast ] [ "-" ] literal ] ";" |
-                   ( "void" | type ) identifier procedure | struct | "struct" identifier "*" identifier ";" } .
+procedure         = "(" [ variable { "," variable } ] ")"
+                     ( ";" | "{" { variable ";" | struct } { statement } "}" ) .
+
+cstar             = { type identifier [ "[" expression "]" ] [ "[" expression "]" ] [ "=" [ cast ] [ "-" ] literal ] ";" |
+                    ( "void" | type ) identifier procedure | struct | "struct" identifier "*" identifier ";" } .
                    
                    
                    
