@@ -3488,15 +3488,45 @@ int gr_compareExpression(int* cfAttribute) {
 
 int gr_expression(int* cfAttribute) {
   int ltype;
+  int rtype;
   int operatorSymbol;
   int brBackToWhile;
   int brForwardToEnd;
 
   brBackToWhile = binaryLength;
+
   brForwardToEnd = 0;
 
   ltype = gr_compareExpression(cfAttribute);
 
+  operatorSymbol = symbol;
+
+  if(operatorSymbol == SYM_LAND) {
+	  getSymbol();
+
+	  rtype = gr_compareExpression(cfAttribute);
+
+      emitIFormat(OP_BEQ, REG_ZR, currentTemporary(), 0);
+
+      tfree(1);
+
+  } else if(operatorSymbol == SYM_LOR) {
+	  getSymbol();
+
+	  rtype = gr_compareExpression(cfAttribute);
+
+      emitIFormat(OP_BEQ, REG_ZR, currentTemporary(), 0);
+
+      tfree(1);
+  }
+
+  // unconditional branch to beginning of while
+  emitIFormat(OP_BEQ, REG_ZR, REG_ZR, (brBackToWhile - binaryLength - WORDSIZE) / WORDSIZE);
+
+  if (brForwardToEnd != 0)
+    // first instruction after loop comes here
+    // now we have our address for the conditional jump from above
+    fixup_relative(brForwardToEnd);
 
   return ltype
 }
