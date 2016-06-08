@@ -516,7 +516,7 @@ void resetStructSymbolTables() {
 // +----+---------+
 
 int* createCfAttribute(){
-	return malloc(SIZEOFINTSTAR + (SIZEOFINT * 4));
+	return malloc(SIZEOFINTSTAR + (SIZEOFINT * 3));
 }
 
 int isCfSet(int* cfAttribute){
@@ -531,10 +531,6 @@ int getCfLoad(int* cfAttribute){
 	return *(cfAttribute + 2);
 }
 
-int isExclamationSet(int* cfAttribute) {
-	return *(cfAttribute + 3);
-}
-
 void setCf(int* cfAttribute, int isSet){
 	*(cfAttribute) = isSet;
 }
@@ -544,10 +540,6 @@ void setCfVal(int* cfAttribute, int newVal){
 
 void setCfLoad(int* cfAttribute, int load){
 	*(cfAttribute + 2) = load;
-}
-
-void setExclamation(int* cfAttribute, int isExclamation){
-	*(cfAttribute + 3) = isExclamation;
 }
 
 int and(int a, int b){
@@ -2857,15 +2849,15 @@ int gr_factor(int* cfAttribute) {
   if(symbol == SYM_LNOT) {
       getSymbol();
 
-      if(isExclamationSet(cfAttribute))
-        setExclamation(cfAttribute, 0);
-      else
-        setExclamation(cfAttribute, 1);
-
       if(symbol == SYM_LPARENTHESIS) {
     	  getSymbol();
 
     	  type = gr_expression(cfAttribute);
+
+        emitIFormat(OP_BEQ, REG_ZR, currentTemporary(), 4);
+      	emitIFormat(OP_ADDIU, REG_ZR, currentTemporary(), 0);
+      	emitIFormat(OP_BEQ, REG_ZR, currentTemporary(), 2);
+      	emitIFormat(OP_ADDIU, REG_ZR, currentTemporary(), 1);
 
     	  if(symbol == SYM_RPARENTHESIS)
     		  getSymbol();
@@ -2873,11 +2865,6 @@ int gr_factor(int* cfAttribute) {
     		  syntaxErrorSymbol(SYM_RPARENTHESIS);
       } else
     	  syntaxErrorSymbol(SYM_LPARENTHESIS);
-
-      if(isExclamationSet(cfAttribute))
-        setExclamation(cfAttribute, 0);
-      else
-        setExclamation(cfAttribute, 1);
 
       return type;
   }
@@ -3311,87 +3298,80 @@ int gr_simpleExpression(int* cfAttribute) {
 }
 
 int gr_shiftExpression(int* cfAttribute){
-		int ltype;
-	    int operatorSymbol;
-	    int rtype;
-	    int leftCfSet;
-	    int leftCfVal;
+  int ltype;
+  int operatorSymbol;
+  int rtype;
+  int leftCfSet;
+  int leftCfVal;
 
-	    ltype = gr_simpleExpression(cfAttribute);
+  ltype = gr_simpleExpression(cfAttribute);
 
-	    leftCfSet = isCfSet(cfAttribute);
-	    leftCfVal = getCfVal(cfAttribute);
-
-
-	    //optional: << >>
-	    while (isShift()) {
-	        operatorSymbol = symbol;
-
-	        getSymbol();
-
-	        setCf(cfAttribute, 0);
-	        rtype = gr_simpleExpression(cfAttribute);
+  leftCfSet = isCfSet(cfAttribute);
+  leftCfVal = getCfVal(cfAttribute);
 
 
-	        if (ltype != rtype)
-	        	typeWarning(ltype, rtype);
+  //optional: << >>
+  while (isShift()) {
+    operatorSymbol = symbol;
 
-	        if (and(leftCfSet, isCfSet(cfAttribute))){
-	        	//fold
-	        		if (operatorSymbol == SYM_LS) {
-	        			leftCfVal = leftCfVal << getCfVal(cfAttribute);
-	        		}else if (operatorSymbol == SYM_RS){
-	        			leftCfVal = leftCfVal >> getCfVal(cfAttribute);
-	        		}
-	        		setCfVal(cfAttribute, leftCfVal);
+    getSymbol();
 
-	        }else{
-	        	if (leftCfSet){
+    setCf(cfAttribute, 0);
+    rtype = gr_simpleExpression(cfAttribute);
 
-	        		load_cf_val(leftCfVal);
+    if (ltype != rtype)
+      typeWarning(ltype, rtype);
 
-	        		if (operatorSymbol == SYM_LS)
-	        			emitRFormat(OP_SPECIAL, currentTemporary(), previousTemporary(), previousTemporary(), FCT_SLLV);
-	        		else if (operatorSymbol == SYM_RS)
-	        			emitRFormat(OP_SPECIAL, currentTemporary(), previousTemporary(), previousTemporary(), FCT_SRLV);
+    if (and(leftCfSet, isCfSet(cfAttribute))){
+      //fold
+      if (operatorSymbol == SYM_LS) {
+        leftCfVal = leftCfVal << getCfVal(cfAttribute);
+      }else if (operatorSymbol == SYM_RS){
+        leftCfVal = leftCfVal >> getCfVal(cfAttribute);
+      }
+        setCfVal(cfAttribute, leftCfVal);
 
-	        		setCf(cfAttribute, 0);
-	        	}else if(isCfSet(cfAttribute)){
+      }else{
+        if (leftCfSet){
 
-	        		load_cf_val(getCfVal(cfAttribute));
+          load_cf_val(leftCfVal);
 
-	        		if (operatorSymbol == SYM_LS)
-	        			emitRFormat(OP_SPECIAL, previousTemporary(), currentTemporary(), previousTemporary(), FCT_SLLV);
-	        		else if (operatorSymbol == SYM_RS)
-	        			emitRFormat(OP_SPECIAL, previousTemporary(), currentTemporary(), previousTemporary(), FCT_SRLV);
+          if (operatorSymbol == SYM_LS)
+            emitRFormat(OP_SPECIAL, currentTemporary(), previousTemporary(), previousTemporary(), FCT_SLLV);
+          else if (operatorSymbol == SYM_RS)
+            emitRFormat(OP_SPECIAL, currentTemporary(), previousTemporary(), previousTemporary(), FCT_SRLV);
 
-	        		setCf(cfAttribute, 0);
-	        	}else{
-	        	  if (operatorSymbol == SYM_LS) {
-	        	      emitRFormat(OP_SPECIAL, previousTemporary(), currentTemporary(), previousTemporary(), FCT_SLLV);
-	              } else {
-   			          emitRFormat(OP_SPECIAL, previousTemporary(), currentTemporary(), previousTemporary(), FCT_SRLV);
-	        	  }
-	        	}
-	        	tfree(1);
-	        }
+          setCf(cfAttribute, 0);
+        }else if(isCfSet(cfAttribute)){
 
+          load_cf_val(getCfVal(cfAttribute));
 
-	        }
+          if (operatorSymbol == SYM_LS)
+            emitRFormat(OP_SPECIAL, previousTemporary(), currentTemporary(), previousTemporary(), FCT_SLLV);
+          else if (operatorSymbol == SYM_RS)
+            emitRFormat(OP_SPECIAL, previousTemporary(), currentTemporary(), previousTemporary(), FCT_SRLV);
 
-	    return ltype;
+          setCf(cfAttribute, 0);
+        }else{
+          if (operatorSymbol == SYM_LS) {
+            emitRFormat(OP_SPECIAL, previousTemporary(), currentTemporary(), previousTemporary(), FCT_SLLV);
+          } else {
+            emitRFormat(OP_SPECIAL, previousTemporary(), currentTemporary(), previousTemporary(), FCT_SRLV);
+          }
+        }
+      tfree(1);
+      }
+  }
+
+  return ltype;
 }
 
 int gr_compareExpression(int* cfAttribute) {
   int ltype;
   int operatorSymbol;
   int rtype;
-  int isExclamation;
-
 
   // assert: n = allocatedTemporaries
-
-  isExclamation = isExclamationSet(cfAttribute);
 
   ltype = gr_shiftExpression(cfAttribute);
 
@@ -3399,7 +3379,6 @@ int gr_compareExpression(int* cfAttribute) {
 	  load_cf_val(getCfVal(cfAttribute));
 	  setCf(cfAttribute, 0);
   }
-
 
   // assert: allocatedTemporaries == n + 1
 
@@ -3411,10 +3390,9 @@ int gr_compareExpression(int* cfAttribute) {
     setCf(cfAttribute, 0);
     rtype = gr_shiftExpression(cfAttribute);
     if(isCfSet(cfAttribute)){
-    	  load_cf_val(getCfVal(cfAttribute));
-    	  setCf(cfAttribute, 0);
-      }
-
+      load_cf_val(getCfVal(cfAttribute));
+      setCf(cfAttribute, 0);
+    }
 
     // assert: allocatedTemporaries == n + 2
 
@@ -3426,59 +3404,37 @@ int gr_compareExpression(int* cfAttribute) {
       emitRFormat(OP_SPECIAL, previousTemporary(), currentTemporary(), previousTemporary(), FCT_SUBU);
 
       tfree(1);
-      if(isExclamation){
-    	  emitIFormat(OP_BNE, REG_ZR, currentTemporary(), 4);
-    	  emitIFormat(OP_ADDIU, REG_ZR, currentTemporary(), 0);
-    	  emitIFormat(OP_BEQ, REG_ZR, currentTemporary(), 2);
-    	  emitIFormat(OP_ADDIU, REG_ZR, currentTemporary(), 1);
-      } else {
-          emitIFormat(OP_BEQ, REG_ZR, currentTemporary(), 4);
-          emitIFormat(OP_ADDIU, REG_ZR, currentTemporary(), 0);
-          emitIFormat(OP_BEQ, REG_ZR, currentTemporary(), 2);
-          emitIFormat(OP_ADDIU, REG_ZR, currentTemporary(), 1);
-      }
+
+      emitIFormat(OP_BEQ, REG_ZR, currentTemporary(), 4);
+      emitIFormat(OP_ADDIU, REG_ZR, currentTemporary(), 0);
+      emitIFormat(OP_BEQ, REG_ZR, currentTemporary(), 2);
+      emitIFormat(OP_ADDIU, REG_ZR, currentTemporary(), 1);
 
     } else if (operatorSymbol == SYM_NOTEQ) {
       // subtract, if result = 0 then 0, else 1
       emitRFormat(OP_SPECIAL, previousTemporary(), currentTemporary(), previousTemporary(), FCT_SUBU);
 
       tfree(1);
-      if(isExclamation){
-    	emitIFormat(OP_BEQ, REG_ZR, currentTemporary(), 4);
-    	emitIFormat(OP_ADDIU, REG_ZR, currentTemporary(), 0);
-    	emitIFormat(OP_BEQ, REG_ZR, currentTemporary(), 2);
-    	emitIFormat(OP_ADDIU, REG_ZR, currentTemporary(), 1);
-      } else {
-        emitIFormat(OP_BNE, REG_ZR, currentTemporary(), 4);
-        emitIFormat(OP_ADDIU, REG_ZR, currentTemporary(), 0);
-        emitIFormat(OP_BEQ, REG_ZR, currentTemporary(), 2);
-        emitIFormat(OP_ADDIU, REG_ZR, currentTemporary(), 1);
-      }
+      emitIFormat(OP_BNE, REG_ZR, currentTemporary(), 4);
+      emitIFormat(OP_ADDIU, REG_ZR, currentTemporary(), 0);
+      emitIFormat(OP_BEQ, REG_ZR, currentTemporary(), 2);
+      emitIFormat(OP_ADDIU, REG_ZR, currentTemporary(), 1);
 
     } else if (operatorSymbol == SYM_LT) {
       // set to 1 if a < b, else 0
-      if(isExclamation)
-    	emitRFormat(OP_SPECIAL, currentTemporary(), previousTemporary(), previousTemporary(), FCT_SLT);
-      else
-        emitRFormat(OP_SPECIAL, previousTemporary(), currentTemporary(), previousTemporary(), FCT_SLT);
+      emitRFormat(OP_SPECIAL, previousTemporary(), currentTemporary(), previousTemporary(), FCT_SLT);
 
       tfree(1);
 
     } else if (operatorSymbol == SYM_GT) {
       // set to 1 if b < a, else 0
-      if(isExclamation)
-    	emitRFormat(OP_SPECIAL, previousTemporary(), currentTemporary(), previousTemporary(), FCT_SLT);
-      else
-        emitRFormat(OP_SPECIAL, currentTemporary(), previousTemporary(), previousTemporary(), FCT_SLT);
+      emitRFormat(OP_SPECIAL, currentTemporary(), previousTemporary(), previousTemporary(), FCT_SLT);
 
       tfree(1);
 
     } else if (operatorSymbol == SYM_LEQ) {
       // if b < a set 0, else 1
-      if(isExclamation)
-      	emitRFormat(OP_SPECIAL, previousTemporary(), currentTemporary(), previousTemporary(), FCT_SLT);
-      else
-        emitRFormat(OP_SPECIAL, currentTemporary(), previousTemporary(), previousTemporary(), FCT_SLT);
+      emitRFormat(OP_SPECIAL, currentTemporary(), previousTemporary(), previousTemporary(), FCT_SLT);
 
       tfree(1);
 
@@ -3489,10 +3445,7 @@ int gr_compareExpression(int* cfAttribute) {
 
     } else if (operatorSymbol == SYM_GEQ) {
       // if a < b set 0, else 1
-      if(isExclamation)
-      	emitRFormat(OP_SPECIAL, currentTemporary(), previousTemporary(), previousTemporary(), FCT_SLT);
-      else
-        emitRFormat(OP_SPECIAL, previousTemporary(), currentTemporary(), previousTemporary(), FCT_SLT);
+      emitRFormat(OP_SPECIAL, previousTemporary(), currentTemporary(), previousTemporary(), FCT_SLT);
 
       tfree(1);
 
@@ -3524,7 +3477,8 @@ int gr_expression(int* cfAttribute) {
 
     if(operatorSymbol == SYM_LAND) {
 
-    	brForwardToEnd = binaryLength;
+      brForwardToEnd = binaryLength;
+
 
 	  emitIFormat(OP_BEQ, REG_ZR, currentTemporary(), 0);
 
@@ -3533,7 +3487,7 @@ int gr_expression(int* cfAttribute) {
 
     } else if(operatorSymbol == SYM_LOR) {
 
-    	brForwardToEnd = binaryLength;
+      brForwardToEnd = binaryLength;
 
 	  emitIFormat(OP_BNE, REG_ZR, currentTemporary(), 0);
 
@@ -7758,15 +7712,6 @@ void test2(){
 	}
 
 	print((int*) "Test6: ");
-	if(!(x == y) && 1 == 1 || !(1 == 2)){
-		print((int*) "true");
-		println();
-	} else {
-		print((int*) "false");
-		println();
-	}
-
-	print((int*) "Test7: ");
 	if(!(x == y) && 1 == 1 && !(1 == 2)){
 		print((int*) "false");
 		println();
@@ -7775,30 +7720,30 @@ void test2(){
 		println();
 	}
 
+	print((int*) "Test7: ");
+	if(!(99 == 89 || 66 < 55)){
+		print((int*) "true");
+		println();
+	} else {
+		print((int*) "false");
+		println();
+	}
+
 	print((int*) "Test8: ");
-	if(!(x == y) || 1 == 1 && !(1 == 2)){
-		print((int*) "true");
-		println();
-	} else {
-		print((int*) "false");
-		println();
-	}
-
-	print((int*) "Test9: ");
-	if(!((1 == 2) || (2 < 1))){
-		print((int*) "true");
-		println();
-	} else {
-		print((int*) "false");
-		println();
-	}
-
-	print((int*) "Test10: ");
 	if(!((1 == 2) || !(2 < 1))){
 		print((int*) "false");
 		println();
 	} else {
 		print((int*) "true");
+		println();
+	}
+
+	print((int*) "Test9: ");
+	if(!(!(x == y))){
+		print((int*) "true");
+		println();
+	} else {
+		print((int*) "false");
 		println();
 	}
 
@@ -7826,7 +7771,7 @@ int main(int argc, int* argv) {
 
   print((int*) "This is BeTheCompiler Selfie");
   println();
-  test2();
+  //test2();
 
   if (selfie(argc, (int*) argv) != 0) {
     print(selfieName);

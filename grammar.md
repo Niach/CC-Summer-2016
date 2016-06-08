@@ -71,8 +71,4 @@ procedure         = "(" [ variable { "," variable } ] ")"
                      ( ";" | "{" { variable ";" | struct } { statement } "}" ) .
 
 cstar             = { type identifier [ "[" expression "]" ] [ "[" expression "]" ] [ "=" [ cast ] [ "-" ] literal ] ";" |
-                    ( "void" | type ) identifier procedure | struct | "struct" identifier "*" identifier ";" } .
-                   
-                   
-                   
-                   
+                    ( "void" | type ) identifier procedure | struct | "struct" identifier "*" identifier ";" } .          
