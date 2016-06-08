@@ -1805,13 +1805,10 @@ int isCharacterLetter() {
 }
 
 int isCharacterDigit() {
-  if (character >= '0')
-    if (character <= '9')
-      return 1;
-    else
-      return 0;
+  if(character >= '0' && character <= '9')
+	  return 1;
   else
-    return 0;
+	  return 0;
 }
 
 int isCharacterLetterOrDigitOrUnderscore() {
@@ -2412,6 +2409,15 @@ int isShift(){
 
 }
 
+int isAndOrOR() {
+	if(symbol == SYM_LAND)
+		return 1;
+	else if(symbol == SYM_LOR)
+		return 1;
+	else
+		return 0;
+}
+
 int lookForFactor() {
   if (symbol == SYM_LPARENTHESIS)
     return 0;
@@ -2850,14 +2856,30 @@ int gr_factor(int* cfAttribute) {
   // optional logical not : [ ! ]
   if(symbol == SYM_LNOT) {
       getSymbol();
-      if(!(symbol == SYM_LPARENTHESIS))
-    	  syntaxErrorSymbol(SYM_LPARENTHESIS);
+
       if(isExclamationSet(cfAttribute))
         setExclamation(cfAttribute, 0);
       else
         setExclamation(cfAttribute, 1);
-  } else {
-      setExclamation(cfAttribute, 0);
+
+      if(symbol == SYM_LPARENTHESIS) {
+    	  getSymbol();
+
+    	  type = gr_expression(cfAttribute);
+
+    	  if(symbol == SYM_RPARENTHESIS)
+    		  getSymbol();
+    	  else
+    		  syntaxErrorSymbol(SYM_RPARENTHESIS);
+      } else
+    	  syntaxErrorSymbol(SYM_LPARENTHESIS);
+
+      if(isExclamationSet(cfAttribute))
+        setExclamation(cfAttribute, 0);
+      else
+        setExclamation(cfAttribute, 1);
+
+      return type;
   }
 
   // optional cast: [ cast ]
@@ -3490,45 +3512,42 @@ int gr_expression(int* cfAttribute) {
   int ltype;
   int rtype;
   int operatorSymbol;
-  int brBackToWhile;
   int brForwardToEnd;
-
-  brBackToWhile = binaryLength;
 
   brForwardToEnd = 0;
 
   ltype = gr_compareExpression(cfAttribute);
 
-  operatorSymbol = symbol;
+  while(isAndOrOR()) {
+    operatorSymbol = symbol;
+    getSymbol();
 
-  if(operatorSymbol == SYM_LAND) {
-	  getSymbol();
+    if(operatorSymbol == SYM_LAND) {
 
+    	brForwardToEnd = binaryLength;
+
+	  emitIFormat(OP_BEQ, REG_ZR, currentTemporary(), 0);
+
+	  tfree(1);
 	  rtype = gr_compareExpression(cfAttribute);
 
-      emitIFormat(OP_BEQ, REG_ZR, currentTemporary(), 0);
+    } else if(operatorSymbol == SYM_LOR) {
 
-      tfree(1);
+    	brForwardToEnd = binaryLength;
 
-  } else if(operatorSymbol == SYM_LOR) {
-	  getSymbol();
+	  emitIFormat(OP_BNE, REG_ZR, currentTemporary(), 0);
 
+	  tfree(1);
 	  rtype = gr_compareExpression(cfAttribute);
 
-      emitIFormat(OP_BEQ, REG_ZR, currentTemporary(), 0);
+    }
+    if(ltype != rtype)
+    	typeWarning(ltype, rtype);
 
-      tfree(1);
+    fixup_relative(brForwardToEnd);
   }
 
-  // unconditional branch to beginning of while
-  emitIFormat(OP_BEQ, REG_ZR, REG_ZR, (brBackToWhile - binaryLength - WORDSIZE) / WORDSIZE);
-
-  if (brForwardToEnd != 0)
-    // first instruction after loop comes here
-    // now we have our address for the conditional jump from above
-    fixup_relative(brForwardToEnd);
-
-  return ltype
+  return ltype;
 }
 
 void gr_while(int* cfAttribute) {
@@ -7693,34 +7712,96 @@ void test2(){
 	print((int*) "------------");
 	println();
 
-	if(x == y){
-		print((int*) "X ist gleich Y");
+	print((int*) "Test1: ");
+	if(x == y && x < z && z > y && x != z){
+		print((int*) "true");
 		println();
-	}
-	if(!(x == y)){
-		print((int*) "!(X ist gleich Y)");
-		println();
-	}
-
-	if(z > x) {
-		print((int*) "2 > 1");
+	} else {
+		print((int*) "false");
 		println();
 	}
 
-	if(!(z > x)) {
-		print((int*) "!(2 > 1)");
+	print((int*) "Test2: ");
+	if(1 < 2 || 1 > 2){
+		print((int*) "true");
+		println();
+	} else {
+		print((int*) "false");
 		println();
 	}
 
-	if(x <= z) {
-		print((int*) "1 <= 2");
+	print((int*) "Test3: ");
+	if(!(x == y) || !(x != y)){
+		print((int*) "true");
+		println();
+	} else {
+		print((int*) "false");
 		println();
 	}
 
-	if(!(x <= z)) {
-		print((int*) "!(1 <= 2)");
+	print((int*) "Test4: ");
+	if(!(x == y) || 1 == 1){
+		print((int*) "true");
+		println();
+	} else {
+		print((int*) "false");
 		println();
 	}
+
+	print((int*) "Test5: ");
+	if(!(x == y) && 1 == 1){
+		print((int*) "false");
+		println();
+	} else {
+		print((int*) "true");
+		println();
+	}
+
+	print((int*) "Test6: ");
+	if(!(x == y) && 1 == 1 || !(1 == 2)){
+		print((int*) "true");
+		println();
+	} else {
+		print((int*) "false");
+		println();
+	}
+
+	print((int*) "Test7: ");
+	if(!(x == y) && 1 == 1 && !(1 == 2)){
+		print((int*) "false");
+		println();
+	} else {
+		print((int*) "true");
+		println();
+	}
+
+	print((int*) "Test8: ");
+	if(!(x == y) || 1 == 1 && !(1 == 2)){
+		print((int*) "true");
+		println();
+	} else {
+		print((int*) "false");
+		println();
+	}
+
+	print((int*) "Test9: ");
+	if(!((1 == 2) || (2 < 1))){
+		print((int*) "true");
+		println();
+	} else {
+		print((int*) "false");
+		println();
+	}
+
+	print((int*) "Test10: ");
+	if(!((1 == 2) || !(2 < 1))){
+		print((int*) "false");
+		println();
+	} else {
+		print((int*) "true");
+		println();
+	}
+
 
 	print((int*) "------------");
 	println();
@@ -7747,17 +7828,11 @@ int main(int argc, int* argv) {
   println();
   test2();
 
-
-
   if (selfie(argc, (int*) argv) != 0) {
     print(selfieName);
     print((int*) ": usage: selfie { -c source | -o binary | -s assembly | -l binary } [ -m size ... | -d size ... | -y size ... ] ");
     println();
   }
-
-
- // print symbols and the count of them
-  //printSymbolTable();
 
   return 0;
 }
