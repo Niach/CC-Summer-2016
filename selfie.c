@@ -513,10 +513,11 @@ void resetStructSymbolTables() {
 // |  0 | isSet?  | set to 1 if the value is set, otherwise 0
 // |  1 | value   | int Value
 // |  2 | load    | set to 1 if the value should be loaded
+// |  3 | fixup   | fixupChain for boolean evaluation
 // +----+---------+
 
 int* createCfAttribute(){
-	return malloc(SIZEOFINTSTAR + (SIZEOFINT * 3));
+	return malloc(SIZEOFINTSTAR + (SIZEOFINT * 4));
 }
 
 int isCfSet(int* cfAttribute){
@@ -531,6 +532,10 @@ int getCfLoad(int* cfAttribute){
 	return *(cfAttribute + 2);
 }
 
+int getCfFixupHead(int* cfAttribute){
+	return *(cfAttribute + 3);
+}
+
 void setCf(int* cfAttribute, int isSet){
 	*(cfAttribute) = isSet;
 }
@@ -540,6 +545,10 @@ void setCfVal(int* cfAttribute, int newVal){
 
 void setCfLoad(int* cfAttribute, int load){
 	*(cfAttribute + 2) = load;
+}
+
+void setCfFixupHead(int* cfAttribute, int head){
+	*(cfAttribute + 3) = head;
 }
 
 int and(int a, int b){
@@ -600,6 +609,7 @@ int  gr_term(int* cfAttribute);
 int  gr_shiftExpression(int* cfAttribute);
 int  gr_simpleExpression(int* cfAttribute);
 int  gr_compareExpression(int* cfAttribute);
+int  gr_andExpression(int* cfAttribute);
 int  gr_expression(int* cfAttribute);
 void gr_while(int* cfAttribute);
 void gr_if(int* cfAttribute);
@@ -846,6 +856,7 @@ void emitIFormat(int opcode, int rs, int rt, int immediate);
 void emitJFormat(int opcode, int instr_index);
 
 void fixup_relative(int fromAddress);
+void fixup_relative_list(int* cfAttribute, int pos);
 void fixup_absolute(int fromAddress, int toAddress);
 void fixlink_absolute(int fromAddress, int toAddress);
 
@@ -2854,6 +2865,7 @@ int gr_factor(int* cfAttribute) {
 
     	  type = gr_expression(cfAttribute);
 
+        // invert expression Result
         emitIFormat(OP_BEQ, REG_ZR, currentTemporary(), 4);
       	emitIFormat(OP_ADDIU, REG_ZR, currentTemporary(), 0);
       	emitIFormat(OP_BEQ, REG_ZR, currentTemporary(), 2);
@@ -3461,45 +3473,65 @@ int gr_compareExpression(int* cfAttribute) {
   return ltype;
 }
 
+int gr_andExpression(int* cfAttribute) {
+  int ltype;
+  int rtype;
+  int* listEntry;
+
+	ltype = gr_compareExpression(cfAttribute);
+
+	while(symbol == SYM_LAND) {
+    getSymbol();
+
+    listEntry = malloc(SIZEOFINT + SIZEOFINTSTAR);
+    *listEntry = binaryLength;
+    *(listEntry + 1) = 0;
+
+    *(listEntry + 1) = *(cfAttribute + 3);
+    *(cfAttribute + 3) = (int) listEntry;
+
+    emitIFormat(OP_BEQ, REG_ZR, currentTemporary(), 0);
+
+	  tfree(1);
+
+    rtype = gr_compareExpression(cfAttribute);
+
+	  if(ltype != rtype)
+	   typeWarning(ltype, rtype);
+	}
+  fixup_relative_list(cfAttribute, 0);
+
+	return ltype;
+}
+
 int gr_expression(int* cfAttribute) {
   int ltype;
   int rtype;
-  int operatorSymbol;
-  int brForwardToEnd;
+  int* listEntry;
 
-  brForwardToEnd = 0;
+  ltype = gr_andExpression(cfAttribute);
 
-  ltype = gr_compareExpression(cfAttribute);
-
-  while(isAndOrOR()) {
-    operatorSymbol = symbol;
+  while(symbol == SYM_LOR) {
     getSymbol();
 
-    if(operatorSymbol == SYM_LAND) {
+    listEntry = malloc(SIZEOFINT + SIZEOFINTSTAR);
+    *listEntry = binaryLength;
+    *(listEntry + 1) = 0;
 
-      brForwardToEnd = binaryLength;
-
-
-	  emitIFormat(OP_BEQ, REG_ZR, currentTemporary(), 0);
-
-	  tfree(1);
-	  rtype = gr_compareExpression(cfAttribute);
-
-    } else if(operatorSymbol == SYM_LOR) {
-
-      brForwardToEnd = binaryLength;
+    *(listEntry + 1) = *(cfAttribute + 4);
+    *(cfAttribute + 4) = (int) listEntry;
 
 	  emitIFormat(OP_BNE, REG_ZR, currentTemporary(), 0);
 
-	  tfree(1);
-	  rtype = gr_compareExpression(cfAttribute);
+    tfree(1);
 
-    }
+	  rtype = gr_andExpression(cfAttribute);
+
     if(ltype != rtype)
     	typeWarning(ltype, rtype);
 
-    fixup_relative(brForwardToEnd);
   }
+  fixup_relative_list(cfAttribute, 1);
 
   return ltype;
 }
@@ -4868,6 +4900,19 @@ void fixup_relative(int fromAddress) {
       getRS(instruction),
       getRT(instruction),
       (binaryLength - fromAddress - WORDSIZE) / WORDSIZE));
+}
+
+void fixup_relative_list(int* cfAttribute, int pos) {
+  int* current;
+
+  current = (int*) *(cfAttribute + 3 + pos);
+
+  while(current != (int*) 0) {
+    fixup_relative(*current);
+    current = (int*) *(current + 1);
+  }
+
+  *(cfAttribute + 3 + pos) =  0;
 }
 
 void fixup_absolute(int fromAddress, int toAddress) {
@@ -7771,7 +7816,7 @@ int main(int argc, int* argv) {
 
   print((int*) "This is BeTheCompiler Selfie");
   println();
-  //test2();
+  test2();
 
   if (selfie(argc, (int*) argv) != 0) {
     print(selfieName);
