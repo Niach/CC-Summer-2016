@@ -29,6 +29,10 @@ simple: selfie
 assembly: selfie
 	./selfie -c selfie.c -s selfie.s
 
+# write debug
+debug: selfie
+	./selfie -c selfie.c -d 1
+
 # Clean up
 clean:
 	rm -rf *.m

@@ -856,7 +856,7 @@ void emitIFormat(int opcode, int rs, int rt, int immediate);
 void emitJFormat(int opcode, int instr_index);
 
 void fixup_relative(int fromAddress);
-void fixup_relative_list(int* cfAttribute, int pos);
+void fixup_relative_list(int* cfAttribute, int count);
 void fixup_absolute(int fromAddress, int toAddress);
 void fixlink_absolute(int fromAddress, int toAddress);
 
@@ -1793,16 +1793,8 @@ int findNextCharacter() {
 }
 
 int isCharacterLetter() {
-  if (character >= 'a')
-    if (character <= 'z')
-      return 1;
-    else
-      return 0;
-  else if (character >= 'A')
-    if (character <= 'Z')
-      return 1;
-    else
-      return 0;
+  if(character >= 'a' && character <= 'z' || character >= 'A' && character <= 'Z')
+    return 1;
   else
     return 0;
 }
@@ -3466,6 +3458,8 @@ int gr_compareExpression(int* cfAttribute) {
       emitIFormat(OP_BEQ, REG_ZR, REG_ZR, 2);
       emitIFormat(OP_ADDIU, REG_ZR, currentTemporary(), 0);
     }
+
+    ltype = INT_T;
   }
 
   // assert: allocatedTemporaries == n + 1
@@ -3476,20 +3470,23 @@ int gr_compareExpression(int* cfAttribute) {
 int gr_andExpression(int* cfAttribute) {
   int ltype;
   int rtype;
+  int count;
   int* listEntry;
+
+  count = 0;
 
 	ltype = gr_compareExpression(cfAttribute);
 
 	while(symbol == SYM_LAND) {
     getSymbol();
+    count = count + 1;
 
     listEntry = malloc(SIZEOFINT + SIZEOFINTSTAR);
-    *listEntry = binaryLength;
-    *(listEntry + 1) = 0;
 
     *(listEntry + 1) = *(cfAttribute + 3);
     *(cfAttribute + 3) = (int) listEntry;
 
+    *listEntry = binaryLength;
     emitIFormat(OP_BEQ, REG_ZR, currentTemporary(), 0);
 
 	  tfree(1);
@@ -3498,8 +3495,9 @@ int gr_andExpression(int* cfAttribute) {
 
 	  if(ltype != rtype)
 	   typeWarning(ltype, rtype);
+
 	}
-  fixup_relative_list(cfAttribute, 0);
+  fixup_relative_list(cfAttribute, count);
 
 	return ltype;
 }
@@ -3507,20 +3505,23 @@ int gr_andExpression(int* cfAttribute) {
 int gr_expression(int* cfAttribute) {
   int ltype;
   int rtype;
+  int count;
   int* listEntry;
+
+  count = 0;
 
   ltype = gr_andExpression(cfAttribute);
 
   while(symbol == SYM_LOR) {
     getSymbol();
+    count = count + 1;
 
     listEntry = malloc(SIZEOFINT + SIZEOFINTSTAR);
+
+    *(listEntry + 1) = *(cfAttribute + 3);
+    *(cfAttribute + 3) = (int) listEntry;
+
     *listEntry = binaryLength;
-    *(listEntry + 1) = 0;
-
-    *(listEntry + 1) = *(cfAttribute + 4);
-    *(cfAttribute + 4) = (int) listEntry;
-
 	  emitIFormat(OP_BNE, REG_ZR, currentTemporary(), 0);
 
     tfree(1);
@@ -3531,7 +3532,7 @@ int gr_expression(int* cfAttribute) {
     	typeWarning(ltype, rtype);
 
   }
-  fixup_relative_list(cfAttribute, 1);
+  fixup_relative_list(cfAttribute, count);
 
   return ltype;
 }
@@ -4902,17 +4903,17 @@ void fixup_relative(int fromAddress) {
       (binaryLength - fromAddress - WORDSIZE) / WORDSIZE));
 }
 
-void fixup_relative_list(int* cfAttribute, int pos) {
+void fixup_relative_list(int* cfAttribute, int count) {
   int* current;
 
-  current = (int*) *(cfAttribute + 3 + pos);
+  current = (int*) getCfFixupHead(cfAttribute);
 
-  while(current != (int*) 0) {
+  while(current != (int*) 0 && count > 0) {
     fixup_relative(*current);
     current = (int*) *(current + 1);
+    setCfFixupHead(cfAttribute, (int) current);
+    count = count - 1;
   }
-
-  *(cfAttribute + 3 + pos) =  0;
 }
 
 void fixup_absolute(int fromAddress, int toAddress) {
@@ -7791,6 +7792,24 @@ void test2(){
 		print((int*) "false");
 		println();
 	}
+
+  print((int*) "Test10: ");
+  if(1 == 1 || 1 == 2 && 1 == 1){
+    print((int*) "true");
+    println();
+  } else {
+    print((int*) "false");
+    println();
+  }
+
+  print((int*) "Test11: ");
+  if(!(1 == 2) || 1 == 2 && 1 == 1){
+    print((int*) "true");
+    println();
+  } else {
+    print((int*) "false");
+    println();
+  }
 
 
 	print((int*) "------------");
