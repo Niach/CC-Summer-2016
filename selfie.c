@@ -7835,7 +7835,7 @@ int main(int argc, int* argv) {
 
   print((int*) "This is BeTheCompiler Selfie");
   println();
-  test2();
+  //test2();
 
   if (selfie(argc, (int*) argv) != 0) {
     print(selfieName);
