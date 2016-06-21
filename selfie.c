@@ -112,6 +112,7 @@ void printString(int* s);
 int roundUp(int n, int m);
 
 int* malloc(int size);
+void free(int* pointer);
 void exit(int code);
 
 // ------------------------ GLOBAL CONSTANTS -----------------------
@@ -909,6 +910,9 @@ void implementOpen();
 void emitMalloc();
 void implementMalloc();
 
+void emitFree();
+void implementFree();
+
 // ------------------------ GLOBAL CONSTANTS -----------------------
 
 int debug_read   = 0;
@@ -1131,6 +1135,8 @@ int* pt = (int*) 0; // page table
 
 int brk = 0; // break between code, data, and heap
 
+int* freeList = (int*) 0; // linked list: address, next list item
+
 int trap = 0; // flag for creating a trap
 
 int status = 0; // machine status including faulting address
@@ -1184,6 +1190,10 @@ void resetInterpreter() {
   pt = (int*) 0;
 
   brk = maxBinaryLength;
+
+  freeList = malloc(SIZEOFINT * 2);
+  *freeList = maxBinaryLength;
+  *(freeList + 1) = 0;
 
   trap = 0;
 
@@ -5500,6 +5510,7 @@ void emitMalloc() {
 void implementMalloc() {
   int size;
   int bump;
+  int* currentFreeListElement;
 
   if (debug_malloc) {
     print(binaryName);
@@ -5511,14 +5522,29 @@ void implementMalloc() {
 
   size = roundUp(*(registers+REG_A0), WORDSIZE);
 
-  bump = brk;
+  currentFreeListElement = freeList;
+
+  while(*(currentFreeListElement + 1) < size && *(currentFreeListElement + 1) != -1) {
+	  currentFreeListElement = (int*) *(currentFreeListElement + 1);
+  }
+
+  bump = *currentFreeListElement;
+
 
   if (bump + size >= *(registers+REG_SP))
     throwException(EXCEPTION_HEAPOVERFLOW, 0);
   else {
     *(registers+REG_V0) = bump;
 
-    brk = bump + size;
+    if(*(currentFreeListElement + 1) == -1){
+    	*currentFreeListElement = bump + size;
+    	brk = bump + size;
+    } else if(*(currentFreeListElement + 1) > size) {
+    	*currentFreeListElement = bump + size;
+    	*(currentFreeListElement + 1) = *(currentFreeListElement + 1) - size;
+    } else {
+        currentFreeListElement = (int*) *(currentFreeListElement + 2);
+    }
 
     if (debug_malloc) {
       print(binaryName);
@@ -5529,6 +5555,23 @@ void implementMalloc() {
       println();
     }
   }
+}
+
+void free(int* pointer) {
+	int* nextFreeListElement;
+
+	nextFreeListElement = malloc(SIZEOFINT * 3);
+	*nextFreeListElement = (int) pointer;
+}
+
+// TODO
+void emitFree() {
+	createSymbolTableEntry(LIBRARY_TABLE, (int*) "free", 0, PROCEDURE, INTSTAR_T, 0, binaryLength);
+}
+
+// TODO
+void implementFree() {
+
 }
 
 // -----------------------------------------------------------------
