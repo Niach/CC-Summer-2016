@@ -30,8 +30,6 @@ Assignment 0: Your Team!
 __Deadline__: March 10, 10am (hard, no extensions)
 
 Suppose your team name is *TheCompilables*. Change selfie such that it prints "This is TheCompilables Selfie" in a separate line on the console before doing anything else. All other functionality should be unaffected.
-<<<<<<< HEAD
-=======
 
 Assignment 1: Bitwise Shift Instructions
 ----------------------------------------
@@ -53,4 +51,66 @@ Assignment 3: Bitwise Shift Operators (Code Generation, Self-Compilation)
 __Deadline__: April 14, 10am (hard, no extensions)
 
 Implement in starc code generation for the shift operators `<<` and `>>` of Assignment 2 using the logical bitwise shift instructions of Assignment 1. The semantics of both operators should be logical bitwise shift meaning that zeros are shifted in on either end (even for `>>` of negative numbers). Change the implementation of the leftShift and rightShift procedures using `<<` and `>>` instead of `*` and `/` such that the original semantics of both procedures is preserved. Avoid calling the twoToThePowerOf procedure in your solution. Finally, demonstrate that self-compilation of selfie still works and check which procedures are now the most called procedures during self-compilation.
->>>>>>> branch 'master' of https://github.com/Niach/CC-Summer-2016.git
+
+Assignment 4: Constant Folding
+------------------------------
+
+__Deadline__: April 28, 10am (hard, no extensions)
+
+Implement constant folding in arithmetic expressions. For this purpose introduce a grammar attribute that represents the value of an expression if available. Use the attribute to evaluate constant expressions at compile time and delay code generation for arithmetic expressions accordingly. Represent the attribute by a call-by-reference parameter to the involved parsing procedures. The parameter needs to carry the value and a flag that indicates if a value is available. Use exactly one instance of the parameter for parsing an arithmetic expression. Test your code by including code snippets in `main` that are subject to constant folding. Also, make sure that self-compilation of selfie still works.
+
+Assignment 5: Arrays
+--------------------
+
+__Deadline__: May 6, 10am (hard, no extensions)
+
+Implement one-dimensional arrays with support of constant folding in size and index expressions. As usual, extend the C\* grammar first and then implement parsing and code generation. Focus on global array variables first. Then implement local array variables and finally array parameters. To test your code modify selfie such that the `SYMBOLS` variable is declared and accessed as array of integers `int SYMBOLS[28]`.
+
+Assignment 6: Two-Dimensional Arrays
+------------------------------------
+
+__Deadline__: May 12, 10am (hard, no extensions)
+
+Extend your implementation of one-dimensional arrays to two-dimensional arrays. To test your code modify selfie such that the `SYMBOLS` variable is declared and accessed as two-dimensional array of integers `int SYMBOLS[28][2]`. For each `symbol` store the symbol's string in `SYMBOLS[symbol][0]` and count the number of its occurrences in the parsed input in `SYMBOLS[symbol][1]`. After compilation output `SYMBOL[symbol][1]` on the console for each `symbol`.
+
+Assignment 7: Struct Declarations
+---------------------------------
+
+__Deadline__: May 19, 10am (hard, no extensions)
+
+Implement global and local pointer-to-struct declarations as well as pointer-to-struct parameters but leave struct access to the next assignment. As with arrays implement global declarations first, then local declarations, and finally parameters. To test your code declare a `struct` for symbol table entries in selfie but do not actually use the `struct`.
+
+Assignment 8: Struct Access
+---------------------------
+
+__Deadline__: May 27, 10am (hard, no extensions)
+
+Implement `struct` access. To test your code complete the port of the symbol table in selfie to structs and demonstrate self-compilation.
+
+Assignment 9: Boolean Operators (Individual)
+--------------------------------------------
+
+__Deadline__: June 9, 10am (hard, no extensions)
+
+Implement the Boolean operators `&&`, `||`, and `!` with lazy evaluation. Occurrences of `&&` and `||` in the same expression are not required to work. However, occurrences of `!` and `&&` as well as `!` and `||` in the same expression must work. To test your code replace the `isCharacterDigit` function by an adequate Boolean expression and demonstrate self-compilation.
+
+Assignment 10: Boolean Operators (Algebra)
+------------------------------------------
+
+__Deadline__: June 16, 10am (hard, no extensions)
+
+Complete your implementation of the Boolean operators `&&`, `||`, and `!` such that any occurrences of the operators in the same expression are supported. To test your code replace the `isCharacterLetter` function by an adequate Boolean expression and demonstrate self-compilation.
+
+Assignment 11: Memory Management
+--------------------------------
+
+__Deadline__: June 23, 10am (hard, no extensions)
+
+Implement `void free(int* address)` in selfie such that memory allocated by `int* malloc(int size)` is reused if `size` is equal to some constant value large enough to fit symbol table entries. To test your code free all memory allocated for local symbol tables when it is not needed anymore.
+
+Assignment 12: Final Project
+----------------------------
+
+__Deadline__: June 30, 10am (hard, no extensions)
+
+Clean up all of your code and write a one-page PDF summarizing what you did and how, and what works and what does not. Point out anything you did beyond what we asked for. Include your team's and team member's names.
