@@ -382,6 +382,7 @@ void resetSymbolTables();
 void createSymbolTableEntry(int which, int* string, int line, int class, int type, int value, int address);
 int* searchSymbolTable(int* entry, int* string, int class);
 int* getSymbolTableEntry(int* string, int class);
+void freeLocalSymbolTable();
 
 int isUndefinedProcedure(int* entry);
 int reportUndefinedProcedures();
@@ -458,7 +459,6 @@ void setStructSize(int* entry, int size)          { *(entry + 4) = size; }
 void setStructFields(int* entry, int* fields)     { *(entry + 5) = (int) fields; }
 void setStructFieldCount(int* entry, int count)   { *(entry + 6) = count; }
 
-
 // ------------------------ GLOBAL CONSTANTS -----------------------
 
 // classes
@@ -502,8 +502,6 @@ void resetStructSymbolTables() {
   global_struct_symbol_table = (int*) 0;
   local_struct_symbol_table = (int*) 0;
 }
-
-
 
 // -----------------------------------------------------------------
 // -----------------------CONSTANT FOLDING -------------------------
@@ -920,6 +918,7 @@ int debug_write  = 0;
 int debug_open   = 0;
 
 int debug_malloc = 0;
+int debug_free   = 0;
 
 int SYSCALL_EXIT   = 4001;
 int SYSCALL_READ   = 4003;
@@ -927,6 +926,7 @@ int SYSCALL_WRITE  = 4004;
 int SYSCALL_OPEN   = 4005;
 
 int SYSCALL_MALLOC = 4045;
+int SYSCALL_FREE   = 4046;
 
 // -----------------------------------------------------------------
 // ----------------------- HYPSTER SYSCALLS ------------------------
@@ -1135,7 +1135,7 @@ int* pt = (int*) 0; // page table
 
 int brk = 0; // break between code, data, and heap
 
-int* freeList = (int*) 0; // linked list: address, next list item
+int freeList = 0; // linked list, stored in virtual Memory
 
 int trap = 0; // flag for creating a trap
 
@@ -1191,9 +1191,7 @@ void resetInterpreter() {
 
   brk = maxBinaryLength;
 
-  freeList = malloc(SIZEOFINT * 2);
-  *freeList = maxBinaryLength;
-  *(freeList + 1) = 0;
+  freeList = 0;
 
   trap = 0;
 
@@ -2212,6 +2210,20 @@ int* getSymbolTableEntry(int* string, int class) {
   }
 
   return searchSymbolTable(global_symbol_table, string, class);
+}
+
+void freeLocalSymbolTable() {
+  int* currentEntry;
+  int* nextEntry;
+
+  currentEntry = local_symbol_table;
+
+  while(currentEntry != (int*) 0) {
+    nextEntry = getNextEntry(currentEntry);
+    free(currentEntry);
+    currentEntry = nextEntry;
+  }
+
 }
 
 int isUndefinedProcedure(int* entry) {
@@ -4361,6 +4373,8 @@ void gr_procedure(int* procedure, int returnType, int* cfAttribute) {
   } else
     syntaxErrorUnexpected();
 
+  freeLocalSymbolTable();
+
   local_symbol_table = (int*) 0;
   local_struct_symbol_table = (int*) 0;
 
@@ -4634,6 +4648,7 @@ void selfie_compile() {
   emitWrite();
   emitOpen();
   emitMalloc();
+  emitFree();
 
   emitID();
   emitCreate();
@@ -5510,7 +5525,7 @@ void emitMalloc() {
 void implementMalloc() {
   int size;
   int bump;
-  int* currentFreeListElement;
+  int nextFreeListElement;
 
   if (debug_malloc) {
     print(binaryName);
@@ -5522,56 +5537,86 @@ void implementMalloc() {
 
   size = roundUp(*(registers+REG_A0), WORDSIZE);
 
-  currentFreeListElement = freeList;
+  // using freelist only for size of SymbolTableEntries, WORDSIZE * 10
+  if(freeList != 0 && size == WORDSIZE * 10) {
+    if(isValidVirtualAddress(freeList)) {
+      if(isVirtualAddressMapped(pt, freeList)) {
+        nextFreeListElement = loadVirtualMemory(pt, freeList);
 
-  while(*(currentFreeListElement + 1) < size && *(currentFreeListElement + 1) != -1) {
-	  currentFreeListElement = (int*) *(currentFreeListElement + 1);
-  }
+      } else
+    	  throwException(EXCEPTION_PAGEFAULT, freeList);
+    } else
+    	throwException(EXCEPTION_ADDRESSERROR, freeList);
 
-  bump = *currentFreeListElement;
-
-
-  if (bump + size >= *(registers+REG_SP))
-    throwException(EXCEPTION_HEAPOVERFLOW, 0);
-  else {
-    *(registers+REG_V0) = bump;
-
-    if(*(currentFreeListElement + 1) == -1){
-    	*currentFreeListElement = bump + size;
-    	brk = bump + size;
-    } else if(*(currentFreeListElement + 1) > size) {
-    	*currentFreeListElement = bump + size;
-    	*(currentFreeListElement + 1) = *(currentFreeListElement + 1) - size;
-    } else {
-        currentFreeListElement = (int*) *(currentFreeListElement + 2);
-    }
+    *(registers + REG_V0) = freeList;
+    freeList = nextFreeListElement;
 
     if (debug_malloc) {
       print(binaryName);
-      print((int*) ": actually mallocating ");
+      print((int*) ": actually reusing ");
       print(itoa(size, string_buffer, 10, 0, 0));
       print((int*) " bytes at virtual address ");
-      print(itoa(bump, string_buffer, 16, 8, 0));
+      print(itoa(*(registers+REG_V0), string_buffer, 16, 8, 0));
       println();
     }
+
+  } else {
+      bump = brk;
+
+      if (bump + size >= *(registers+REG_SP))
+        throwException(EXCEPTION_HEAPOVERFLOW, 0);
+      else {
+        *(registers+REG_V0) = bump;
+
+        brk = bump + size;
+
+        if (debug_malloc) {
+          print(binaryName);
+          print((int*) ": actually mallocating ");
+          print(itoa(size, string_buffer, 10, 0, 0));
+          print((int*) " bytes at virtual address ");
+          print(itoa(bump, string_buffer, 16, 8, 0));
+          println();
+        }
+      }
   }
 }
 
-void free(int* pointer) {
-	int* nextFreeListElement;
-
-	nextFreeListElement = malloc(SIZEOFINT * 3);
-	*nextFreeListElement = (int) pointer;
-}
-
-// TODO
 void emitFree() {
 	createSymbolTableEntry(LIBRARY_TABLE, (int*) "free", 0, PROCEDURE, INTSTAR_T, 0, binaryLength);
+    emitIFormat(OP_LW, REG_SP, REG_A0, 0); // size
+    emitIFormat(OP_ADDIU, REG_SP, REG_SP, WORDSIZE);
+
+    emitIFormat(OP_ADDIU, REG_ZR, REG_V0, SYSCALL_FREE);
+    emitRFormat(OP_SPECIAL, 0, 0, 0, FCT_SYSCALL);
+
+    emitRFormat(OP_SPECIAL, REG_RA, 0, 0, FCT_JR);
 }
 
-// TODO
 void implementFree() {
+	int freeListElement;
 
+	if (debug_free) {
+	  print(binaryName);
+	  print((int*) ": trying to free address ");
+	  print(itoa(*(registers+REG_A0), string_buffer, 16, 8, 0));
+	  println();
+	}
+
+	freeListElement = *(registers + REG_A0);
+
+	if(isValidVirtualAddress(freeListElement)) {
+	  if(isVirtualAddressMapped(pt, freeListElement)) {
+        storeVirtualMemory(pt, freeListElement, freeList);
+
+	  } else
+		  throwException(EXCEPTION_PAGEFAULT, freeListElement);
+	} else
+	    throwException(EXCEPTION_ADDRESSERROR, freeListElement);
+
+
+	freeList = freeListElement;
+	*(registers + REG_A0) = 0;
 }
 
 // -----------------------------------------------------------------
@@ -6035,6 +6080,8 @@ void fct_syscall() {
       implementOpen();
     else if (*(registers+REG_V0) == SYSCALL_MALLOC)
       implementMalloc();
+    else if (*(registers+REG_V0) == SYSCALL_FREE)
+      implementFree();
     else if (*(registers+REG_V0) == SYSCALL_ID)
       implementID();
     else if (*(registers+REG_V0) == SYSCALL_CREATE)
@@ -7859,6 +7906,25 @@ void test2(){
 	println();
 }
 
+void testFree() {
+	int* pointer1;
+	int* pointer2;
+	int* pointer3;
+
+	pointer1 = malloc(SIZEOFINT * 10);
+	pointer2 = malloc(SIZEOFINT * 10);
+	pointer3 = malloc(SIZEOFINT * 10);
+
+	free(pointer1);
+	free(pointer2);
+	free(pointer3);
+
+	pointer1 = malloc(SIZEOFINT * 10);
+	pointer2 = malloc(SIZEOFINT * 10);
+	pointer3 = malloc(SIZEOFINT * 10);
+
+}
+
 
 
 int main(int argc, int* argv) {
@@ -7878,7 +7944,7 @@ int main(int argc, int* argv) {
 
   print((int*) "This is BeTheCompiler Selfie");
   println();
-  //test2();
+  //testFree();
 
   if (selfie(argc, (int*) argv) != 0) {
     print(selfieName);
