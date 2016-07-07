@@ -2633,16 +2633,6 @@ int gr_factor() {
 
     type = INTSTAR_T;
 
-  //  "(" expression ")"
-  } else if (symbol == SYM_LPARENTHESIS) {
-    getSymbol();
-
-    type = gr_expression();
-
-    if (symbol == SYM_RPARENTHESIS)
-      getSymbol();
-    else
-      syntaxErrorSymbol(SYM_RPARENTHESIS);
   } else
     syntaxErrorUnexpected();
 
